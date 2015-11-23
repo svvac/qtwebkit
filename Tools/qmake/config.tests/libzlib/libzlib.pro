@@ -3,3 +3,5 @@ OBJECTS_DIR = obj
 CONFIG += console
 win32: LIBS += -lzlib
 else: LIBS += -lz
+
+load(qt_build_config)
