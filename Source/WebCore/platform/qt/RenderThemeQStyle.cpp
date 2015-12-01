@@ -62,12 +62,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-QSharedPointer<StylePainter> RenderThemeQStyle::getStylePainter(const PaintInfo& paintInfo)
+QSharedPointer<StylePainter> RenderThemeQStyle::getStylePainter(
+  const PaintInfo& paintInfo)
 {
-    return QSharedPointer<StylePainter>(new StylePainterQStyle(this, paintInfo, /*RenderObject*/0));
+    return QSharedPointer<StylePainter>(
+      new StylePainterQStyle(this, paintInfo, /*RenderObject*/0));
 }
 
-StylePainterQStyle::StylePainterQStyle(RenderThemeQStyle* theme, const PaintInfo& paintInfo, RenderObject* renderObject)
+StylePainterQStyle::StylePainterQStyle(
+  RenderThemeQStyle* theme, const PaintInfo& paintInfo, RenderObject* renderObject)
     : StylePainter(paintInfo.context)
     , qStyle(theme->qStyle())
     , appearance(NoControlPart)
@@ -77,7 +80,8 @@ StylePainterQStyle::StylePainterQStyle(RenderThemeQStyle* theme, const PaintInfo
         appearance = theme->initializeCommonQStyleOptions(styleOption, renderObject);
 }
 
-StylePainterQStyle::StylePainterQStyle(ScrollbarThemeQStyle* theme, GraphicsContext* context)
+StylePainterQStyle::StylePainterQStyle(
+  ScrollbarThemeQStyle* theme, GraphicsContext* context)
     : StylePainter(context)
     , qStyle(theme->qStyle())
     , appearance(NoControlPart)
@@ -113,8 +117,9 @@ QtStyleFactoryFunction RenderThemeQStyle::styleFactory()
 
 RenderThemeQStyle::RenderThemeQStyle(Page* page)
     : RenderThemeQt(page)
-    , m_qStyle(adoptPtr(styleFactoryFunction(page)))
 {
+    m_qStyle = std::make_unique<QStyleFacade>(styleFactoryFunction(page));
+
     int buttonPixelSize = 0;
     m_qStyle->getButtonMetrics(&m_buttonFontFamily, &buttonPixelSize);
 #ifdef Q_WS_MAC
@@ -131,11 +136,9 @@ void RenderThemeQStyle::setPaletteFromPageClientIfExists(QPalette& palette) cons
     if (!m_page)
         return;
 
-    ChromeClient* chromeClient = m_page->chrome().client();
-    if (!chromeClient)
-        return;
+    auto chromeClient = m_page->chrome().client();
 
-    if (QWebPageClient* pageClient = chromeClient->platformPageClient())
+    if (QWebPageClient* pageClient = chromeClient.platformPageClient())
         palette = pageClient->palette();
 }
 
@@ -153,47 +156,39 @@ QRect RenderThemeQStyle::inflateButtonRect(const QRect& originalRect) const
     return originalRect;
 }
 
-int extendFixedPadding(Length oldPadding, int padding) {
-    if (oldPadding.isFixed()) {
-        return std::max(oldPadding.intValue(), padding);
-    }
-    return padding;
-}
-
-void RenderThemeQStyle::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
+void RenderThemeQStyle::computeSizeBasedOnStyle(RenderStyle& renderStyle) const
 {
     QSize size(0, 0);
-    const QFontMetrics fm(renderStyle->font().syntheticFont());
+    const QFontMetrics fm(renderStyle->fontCascade().primaryFont().syntheticFont());
 
     switch (renderStyle->appearance()) {
     case TextAreaPart:
     case SearchFieldPart:
     case TextFieldPart: {
         int padding = m_qStyle->findFrameLineWidth();
-        renderStyle->setPaddingLeft(Length(extendFixedPadding(renderStyle->paddingLeft(),  padding), Fixed));
-        renderStyle->setPaddingRight(Length(extendFixedPadding(renderStyle->paddingRight(),  padding), Fixed));
-        renderStyle->setPaddingTop(Length(extendFixedPadding(renderStyle->paddingTop(),  padding), Fixed));
-        renderStyle->setPaddingBottom(Length(extendFixedPadding(renderStyle->paddingBottom(),  padding), Fixed));
+        renderStyle.setPaddingLeft(Length(padding, Fixed));
+        renderStyle.setPaddingRight(Length(padding, Fixed));
+        renderStyle.setPaddingTop(Length(padding, Fixed));
+        renderStyle.setPaddingBottom(Length(padding, Fixed));
         break;
     }
     default:
-        renderStyle->resetPadding();
         break;
     }
     // If the width and height are both specified, then we have nothing to do.
-    if (!renderStyle->width().isIntrinsicOrAuto() && !renderStyle->height().isAuto())
+    if (!renderStyle.width().isIntrinsicOrAuto() && !renderStyle->height().isAuto())
         return;
 
     switch (renderStyle->appearance()) {
     case CheckboxPart: {
         int checkBoxWidth = m_qStyle->simplePixelMetric(QStyleFacade::PM_IndicatorWidth, QStyleFacade::State_Small);
-        checkBoxWidth *= renderStyle->effectiveZoom();
+        checkBoxWidth *= renderStyle.effectiveZoom();
         size = QSize(checkBoxWidth, checkBoxWidth);
         break;
     }
     case RadioPart: {
         int radioWidth = m_qStyle->simplePixelMetric(QStyleFacade::PM_ExclusiveIndicatorWidth, QStyleFacade::State_Small);
-        radioWidth *= renderStyle->effectiveZoom();
+        radioWidth *= renderStyle.effectiveZoom();
         size = QSize(radioWidth, radioWidth);
         break;
     }
@@ -223,18 +218,16 @@ void RenderThemeQStyle::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
     }
 
     // FIXME: Check is flawed, since it doesn't take min-width/max-width into account.
-    if (renderStyle->width().isIntrinsicOrAuto() && size.width() > 0)
-        renderStyle->setMinWidth(Length(size.width(), Fixed));
-    if (renderStyle->height().isAuto() && size.height() > 0)
-        renderStyle->setMinHeight(Length(size.height(), Fixed));
+    if (renderStyle.width().isIntrinsicOrAuto() && size.width() > 0)
+        renderStyle.setMinWidth(Length(size.width(), Fixed));
+    if (renderStyle.height().isAuto() && size.height() > 0)
+        renderStyle.setMinHeight(Length(size.height(), Fixed));
 }
 
-
-
-void RenderThemeQStyle::adjustButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element*) const
+void RenderThemeQStyle::adjustButtonStyle(StyleResolver& styleResolver, RenderStyle& style, Element*) const
 {
     // Ditch the border.
-    style->resetBorder();
+    style.resetBorder();
 
 #ifdef Q_WS_MAC
     if (style->appearance() == PushButtonPart) {
@@ -244,23 +237,23 @@ void RenderThemeQStyle::adjustButtonStyle(StyleResolver* styleResolver, RenderSt
     }
 #endif
 
-    FontDescription fontDescription = style->fontDescription();
-    fontDescription.setIsAbsoluteSize(true);
+    FontCascadeDescription fontDescription = style.fontDescription();
+    //fontDescription.setIsAbsoluteSize(true);
 
 #ifdef Q_WS_MAC // Use fixed font size and family on Mac (like Safari does)
-    fontDescription.setSpecifiedSize(m_buttonFontPixelSize);
+    //fontDescription.setSpecifiedSize(m_buttonFontPixelSize);
     fontDescription.setComputedSize(m_buttonFontPixelSize);
 #else
-    fontDescription.setSpecifiedSize(style->fontSize());
-    fontDescription.setComputedSize(style->fontSize());
+    //fontDescription.setComputedSize() setSpecifiedSize(style->fontSize());
+    fontDescription.setComputedSize(style.fontSize());
 #endif
 
     Vector<AtomicString, 1> families;
     families.append(m_buttonFontFamily);
     fontDescription.setFamilies(families);
-    style->setFontDescription(fontDescription);
-    style->font().update(styleResolver->fontSelector());
-    style->setLineHeight(RenderStyle::initialLineHeight());
+    style.setFontDescription(fontDescription);
+    style.font().update(styleResolver->fontSelector());
+    style.setLineHeight(RenderStyle::initialLineHeight());
     setButtonSize(style);
     setButtonPadding(style);
 }
@@ -294,7 +287,7 @@ void RenderThemeQStyle::setButtonPadding(RenderStyle* style) const
     style->setPaddingBottom(Length(paddingBottom, Fixed));
 }
 
-bool RenderThemeQStyle::paintButton(RenderObject* o, const PaintInfo& i, const IntRect& r)
+bool RenderThemeQStyle::paintButton(const RenderObject& o, const PaintInfo& i, const IntRect& r)
 {
     StylePainterQStyle p(this, i, o);
     if (!p.isValid())
@@ -314,7 +307,7 @@ bool RenderThemeQStyle::paintButton(RenderObject* o, const PaintInfo& i, const I
     return false;
 }
 
-bool RenderThemeQStyle::paintTextField(RenderObject* o, const PaintInfo& i, const IntRect& r)
+bool RenderThemeQStyle::paintTextField(const RenderObject& o, const PaintInfo& i, const FloatRect& r)
 {
     StylePainterQStyle p(this, i, o);
     if (!p.isValid())
@@ -335,12 +328,12 @@ bool RenderThemeQStyle::paintTextField(RenderObject* o, const PaintInfo& i, cons
     return false;
 }
 
-void RenderThemeQStyle::adjustTextAreaStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
+void RenderThemeQStyle::adjustTextAreaStyle(StyleResolver& styleResolver, RenderStyle& style, Element* element) const
 {
     adjustTextFieldStyle(styleResolver, style, element);
 }
 
-bool RenderThemeQStyle::paintTextArea(RenderObject* o, const PaintInfo& i, const IntRect& r)
+bool RenderThemeQStyle::paintTextArea(const RenderObject& o, const PaintInfo& i, const FloatRect& r)
 {
     return paintTextField(o, i, r);
 }
@@ -366,7 +359,7 @@ QPalette RenderThemeQStyle::colorPalette() const
     return palette;
 }
 
-bool RenderThemeQStyle::paintMenuList(RenderObject* o, const PaintInfo& i, const IntRect& r)
+bool RenderThemeQStyle::paintMenuList(const RenderObject& o, const PaintInfo& i, const FloatRect& r)
 {
     StylePainterQStyle p(this, i, o);
     if (!p.isValid())
@@ -377,7 +370,7 @@ bool RenderThemeQStyle::paintMenuList(RenderObject* o, const PaintInfo& i, const
     return false;
 }
 
-void RenderThemeQStyle::adjustMenuListButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
+void RenderThemeQStyle::adjustMenuListButtonStyle(StyleResolver& styleResolver, RenderStyle& style, Element* e) const
 {
     // WORKAROUND because html.css specifies -webkit-border-radius for <select> so we override it here
     // see also http://bugs.webkit.org/show_bug.cgi?id=18399
@@ -386,7 +379,7 @@ void RenderThemeQStyle::adjustMenuListButtonStyle(StyleResolver* styleResolver, 
     RenderThemeQt::adjustMenuListButtonStyle(styleResolver, style, e);
 }
 
-bool RenderThemeQStyle::paintMenuListButton(RenderObject* o, const PaintInfo& i, const IntRect& r)
+bool RenderThemeQStyle::paintMenuListButton(const RenderBox& o, const PaintInfo& i, const FloatRect& r)
 {
     StylePainterQStyle p(this, i, o);
     if (!p.isValid())
@@ -425,7 +418,7 @@ bool RenderThemeQStyle::paintProgressBar(RenderObject* o, const PaintInfo& pi, c
 }
 #endif
 
-bool RenderThemeQStyle::paintSliderTrack(RenderObject* o, const PaintInfo& pi, const IntRect& r)
+bool RenderThemeQStyle::paintSliderTrack(const RenderObject& o, const PaintInfo& pi, const IntRect& r)
 {
     StylePainterQStyle p(this, pi, o);
     if (!p.isValid())
@@ -468,7 +461,7 @@ void RenderThemeQStyle::adjustSliderTrackStyle(StyleResolver*, RenderStyle* styl
     style->setBoxShadow(nullptr);
 }
 
-bool RenderThemeQStyle::paintSliderThumb(RenderObject* o, const PaintInfo& pi, const IntRect& r)
+bool RenderThemeQStyle::paintSliderThumb(const RenderObject& o, const PaintInfo& pi, const IntRect& r)
 {
     StylePainterQStyle p(this, pi, o);
     if (!p.isValid())
@@ -491,44 +484,49 @@ bool RenderThemeQStyle::paintSliderThumb(RenderObject* o, const PaintInfo& pi, c
     return false;
 }
 
-void RenderThemeQStyle::adjustSliderThumbStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
+void RenderThemeQStyle::adjustSliderThumbStyle(
+  StyleResolver& styleResolver, RenderStyle& style, Element* element) const
 {
     RenderTheme::adjustSliderThumbStyle(styleResolver, style, element);
     style->setBoxShadow(nullptr);
 }
 
-bool RenderThemeQStyle::paintSearchField(RenderObject* o, const PaintInfo& pi, const IntRect& r)
+bool RenderThemeQStyle::paintSearchField(const RenderObject& o, const PaintInfo& pi, const IntRect& r)
 {
     return paintTextField(o, pi, r);
 }
 
-void RenderThemeQStyle::adjustSearchFieldDecorationStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
+void RenderThemeQStyle::adjustSearchFieldDecorationStyle(
+  StyleResolver& styleResolver, RenderStyle& style, Element* e) const
 {
     notImplemented();
-    RenderTheme::adjustSearchFieldDecorationStyle(styleResolver, style, e);
+    RenderTheme::adjustSearchFieldDecorationPartStyle(styleResolver, style, e);
 }
 
-bool RenderThemeQStyle::paintSearchFieldDecoration(RenderObject* o, const PaintInfo& pi, const IntRect& r)
+bool RenderThemeQStyle::paintSearchFieldDecoration(
+  const RenderObject& o, const PaintInfo& pi, const IntRect& r)
 {
     notImplemented();
-    return RenderTheme::paintSearchFieldDecoration(o, pi, r);
+    return RenderTheme::paintSearchFieldDecorations(o, pi, r);
 }
 
-void RenderThemeQStyle::adjustSearchFieldResultsDecorationStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
+void RenderThemeQStyle::adjustSearchFieldResultsDecorationPartStyle(
+  StyleResolver& styleResolver, RenderStyle& style, Element* e) const
 {
     notImplemented();
-    RenderTheme::adjustSearchFieldResultsDecorationStyle(styleResolver, style, e);
+    RenderTheme::adjustSearchFieldResultsDecorationPartStyle(styleResolver, style, e);
 }
 
-bool RenderThemeQStyle::paintSearchFieldResultsDecoration(RenderObject* o, const PaintInfo& pi, const IntRect& r)
+bool RenderThemeQStyle::paintSearchFieldResultsDecorationPart(
+  const RenderObject& o, PaintInfo& pi, const IntRect& r)
 {
     notImplemented();
-    return RenderTheme::paintSearchFieldResultsDecoration(o, pi, r);
+    return RenderTheme::paintSearchFieldResultsDecorationPart(o, pi, r);
 }
 
 #ifndef QT_NO_SPINBOX
 
-bool RenderThemeQStyle::paintInnerSpinButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& rect)
+bool RenderThemeQStyle::paintInnerSpinButton(const RenderObject& o, const PaintInfo& paintInfo, const IntRect& rect)
 {
     StylePainterQStyle p(this, paintInfo, o);
     if (!p.isValid())
@@ -540,7 +538,7 @@ bool RenderThemeQStyle::paintInnerSpinButton(RenderObject* o, const PaintInfo& p
 }
 #endif
 
-ControlPart RenderThemeQStyle::initializeCommonQStyleOptions(QStyleFacadeOption &option, RenderObject* o) const
+ControlPart RenderThemeQStyle::initializeCommonQStyleOptions(QStyleFacadeOption &option, const RenderObject& o) const
 {
     // Default bits: no focus, no mouse over, enabled
     option.state &= ~(QStyleFacade::State_HasFocus | QStyleFacade::State_MouseOver);
@@ -562,7 +560,7 @@ ControlPart RenderThemeQStyle::initializeCommonQStyleOptions(QStyleFacadeOption 
         option.state &= ~QStyleFacade::State_Enabled;
     }
 
-    RenderStyle* style = o->style();
+    RenderStyle* style = o.style();
     if (!style)
         return NoControlPart;
 
@@ -599,7 +597,7 @@ ControlPart RenderThemeQStyle::initializeCommonQStyleOptions(QStyleFacadeOption 
     return result;
 }
 
-void RenderThemeQStyle::adjustSliderThumbSize(RenderStyle* style, Element* element) const
+void RenderThemeQStyle::adjustSliderThumbSize(RenderStyle& style, Element* element) const
 {
     const ControlPart part = style->appearance();
     if (part == SliderThumbHorizontalPart || part == SliderThumbVerticalPart) {
@@ -610,14 +608,19 @@ void RenderThemeQStyle::adjustSliderThumbSize(RenderStyle* style, Element* eleme
         int length = m_qStyle->sliderLength(orientation);
         int thickness = m_qStyle->sliderThickness(orientation);
         if (orientation == Qt::Vertical) {
-            style->setWidth(Length(thickness, Fixed));
-            style->setHeight(Length(length, Fixed));
+            style.setWidth(Length(thickness, Fixed));
+            style.setHeight(Length(length, Fixed));
         } else {
-            style->setWidth(Length(length, Fixed));
-            style->setHeight(Length(thickness, Fixed));
+            style.setWidth(Length(length, Fixed));
+            style.setHeight(Length(thickness, Fixed));
         }
     } else
         RenderThemeQt::adjustSliderThumbSize(style, element);
+}
+
+void RenderThemeQStyle::updateCachedSystemFontDescription(CSSValueID systemFontID, FontCascadeDescription&) const
+{
+  notImplemented();
 }
 
 }

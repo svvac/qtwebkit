@@ -28,6 +28,7 @@
 
 #import "KeyEventCocoa.h"
 #import "Logging.h"
+#import "NSMenuSPI.h"
 #import "PlatformScreen.h"
 #import "Scrollbar.h"
 #import "WebCoreSystemInterface.h"
@@ -39,12 +40,18 @@ namespace WebCore {
 
 IntPoint globalPoint(const NSPoint& windowPoint, NSWindow *window)
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     return IntPoint(flipScreenPoint([window convertBaseToScreen:windowPoint], screenForWindow(window)));
+#pragma clang diagnostic pop
 }
 
 static IntPoint globalPointForEvent(NSEvent *event)
 {
     switch ([event type]) {
+#if defined(__LP64__) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101003
+        case NSEventTypePressure:
+#endif
         case NSLeftMouseDown:
         case NSLeftMouseDragged:
         case NSLeftMouseUp:
@@ -67,6 +74,9 @@ static IntPoint globalPointForEvent(NSEvent *event)
 static IntPoint pointForEvent(NSEvent *event, NSView *windowView)
 {
     switch ([event type]) {
+#if defined(__LP64__) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101003
+        case NSEventTypePressure:
+#endif
         case NSLeftMouseDown:
         case NSLeftMouseDragged:
         case NSLeftMouseUp:
@@ -95,6 +105,9 @@ static IntPoint pointForEvent(NSEvent *event, NSView *windowView)
 static MouseButton mouseButtonForEvent(NSEvent *event)
 {
     switch ([event type]) {
+#if defined(__LP64__) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101003
+        case NSEventTypePressure:
+#endif
         case NSLeftMouseDown:
         case NSLeftMouseUp:
         case NSLeftMouseDragged:
@@ -157,7 +170,6 @@ static PlatformWheelEventPhase momentumPhaseForEvent(NSEvent *event)
 {
     uint32_t phase = PlatformWheelEventPhaseNone;
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     if ([event momentumPhase] & NSEventPhaseBegan)
         phase |= PlatformWheelEventPhaseBegan;
     if ([event momentumPhase] & NSEventPhaseStationary)
@@ -168,29 +180,12 @@ static PlatformWheelEventPhase momentumPhaseForEvent(NSEvent *event)
         phase |= PlatformWheelEventPhaseEnded;
     if ([event momentumPhase] & NSEventPhaseCancelled)
         phase |= PlatformWheelEventPhaseCancelled;
-#else
-    switch (wkGetNSEventMomentumPhase(event)) {
-    case wkEventPhaseNone:
-        phase = PlatformWheelEventPhaseNone;
-        break;
-    case wkEventPhaseBegan:
-        phase = PlatformWheelEventPhaseBegan;
-        break;
-    case wkEventPhaseChanged:
-        phase = PlatformWheelEventPhaseChanged;
-        break;
-    case wkEventPhaseEnded:
-        phase = PlatformWheelEventPhaseEnded;
-        break;
-    }
-#endif
 
     return static_cast<PlatformWheelEventPhase>(phase);
 }
 
 static PlatformWheelEventPhase phaseForEvent(NSEvent *event)
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     uint32_t phase = PlatformWheelEventPhaseNone; 
     if ([event phase] & NSEventPhaseBegan)
         phase |= PlatformWheelEventPhaseBegan;
@@ -202,44 +197,23 @@ static PlatformWheelEventPhase phaseForEvent(NSEvent *event)
         phase |= PlatformWheelEventPhaseEnded;
     if ([event phase] & NSEventPhaseCancelled)
         phase |= PlatformWheelEventPhaseCancelled;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
     if ([event momentumPhase] & NSEventPhaseMayBegin)
         phase |= PlatformWheelEventPhaseMayBegin;
-#endif
 
     return static_cast<PlatformWheelEventPhase>(phase);
-#else
-    UNUSED_PARAM(event);
-    return PlatformWheelEventPhaseNone;
-#endif
 }
-
-#if ENABLE(GESTURE_EVENTS)
-static PlatformEvent::Type gestureEventTypeForEvent(NSEvent *event)
-{
-    switch ([event type]) {
-    case NSEventTypeBeginGesture:
-        return PlatformEvent::GestureScrollBegin;
-    case NSEventTypeEndGesture:
-        return PlatformEvent::GestureScrollEnd;
-    default:
-        ASSERT_NOT_REACHED();
-        return PlatformEvent::GestureScrollEnd;
-    }
-}
-#endif
 
 static inline String textFromEvent(NSEvent* event)
 {
     if ([event type] == NSFlagsChanged)
-        return String("");
+        return emptyString();
     return String([event characters]);
 }
 
 static inline String unmodifiedTextFromEvent(NSEvent* event)
 {
     if ([event type] == NSFlagsChanged)
-        return String("");
+        return emptyString();
     return String([event charactersIgnoringModifiers]);
 }
 
@@ -268,7 +242,7 @@ String keyIdentifierForKeyEvent(NSEvent* event)
                 
             default:
                 ASSERT_NOT_REACHED();
-                return String("");
+                return emptyString();
         }
     
     NSString *s = [event charactersIgnoringModifiers];
@@ -363,10 +337,17 @@ static CFTimeInterval cachedStartupTimeIntervalSince1970()
 {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
+        void (^updateBlock)(NSNotification *) = Block_copy(^(NSNotification *){ updateSystemStartupTimeIntervalSince1970(); });
         [[[NSWorkspace sharedWorkspace] notificationCenter] addObserverForName:NSWorkspaceDidWakeNotification
                                                                         object:nil
                                                                          queue:nil
-                                                                    usingBlock:^(NSNotification *){ updateSystemStartupTimeIntervalSince1970(); }];
+                                                                    usingBlock:updateBlock];
+        [[NSNotificationCenter defaultCenter] addObserverForName:NSSystemClockDidChangeNotification
+                                                          object:nil
+                                                           queue:nil
+                                                      usingBlock:updateBlock];
+        Block_release(updateBlock);
+
         updateSystemStartupTimeIntervalSince1970();
     });
     return systemStartupTime;
@@ -423,31 +404,69 @@ static inline PlatformEvent::Modifiers modifiersForEvent(NSEvent *event)
     return (PlatformEvent::Modifiers)modifiers;
 }
 
+static int typeForEvent(NSEvent *event)
+{
+    if ([NSMenu respondsToSelector:@selector(menuTypeForEvent:)])
+        return static_cast<int>([NSMenu menuTypeForEvent:event]);
 
+    if (mouseButtonForEvent(event) == RightButton)
+        return static_cast<int>(NSMenuTypeContextMenu);
+
+    if (mouseButtonForEvent(event) == LeftButton && (modifiersForEvent(event) & PlatformEvent::CtrlKey))
+        return static_cast<int>(NSMenuTypeContextMenu);
+
+    return static_cast<int>(NSMenuTypeNone);
+}
+    
 class PlatformMouseEventBuilder : public PlatformMouseEvent {
 public:
-    PlatformMouseEventBuilder(NSEvent *event, NSView *windowView)
+    PlatformMouseEventBuilder(NSEvent *event, NSEvent *correspondingPressureEvent, NSView *windowView)
     {
         // PlatformEvent
-        m_type                              = mouseEventTypeForEvent(event);
-        m_modifiers                         = modifiersForEvent(event);
-        m_timestamp                         = eventTimeStampSince1970(event);
+        m_type = mouseEventTypeForEvent(event);
+
+#if defined(__LP64__) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101003
+        BOOL eventIsPressureEvent = [event type] == NSEventTypePressure;
+        if (eventIsPressureEvent) {
+            // Since AppKit doesn't send mouse events for force down or force up, we have to use the current pressure
+            // event and correspondingPressureEvent to detect if this is MouseForceDown, MouseForceUp, or just MouseForceChanged.
+            if (correspondingPressureEvent.stage == 1 && event.stage == 2)
+                m_type = PlatformEvent::MouseForceDown;
+            else if (correspondingPressureEvent.stage == 2 && event.stage == 1)
+                m_type = PlatformEvent::MouseForceUp;
+            else
+                m_type = PlatformEvent::MouseForceChanged;
+        }
+#else
+        UNUSED_PARAM(correspondingPressureEvent);
+#endif
+
+        m_modifiers = modifiersForEvent(event);
+        m_timestamp = eventTimeStampSince1970(event);
 
         // PlatformMouseEvent
-        m_position                          = pointForEvent(event, windowView);
-        m_globalPosition                    = globalPointForEvent(event);
-        m_button                            = mouseButtonForEvent(event);
-        m_clickCount                        = clickCountForEvent(event);
-        
+        m_position = pointForEvent(event, windowView);
+        m_globalPosition = globalPointForEvent(event);
+        m_button = mouseButtonForEvent(event);
+        m_clickCount = clickCountForEvent(event);
+
+        m_force = 0;
+#if defined(__LP64__) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101003
+        int stage = eventIsPressureEvent ? event.stage : correspondingPressureEvent.stage;
+        double pressure = eventIsPressureEvent ? event.pressure : correspondingPressureEvent.pressure;
+        m_force = pressure + stage;
+#endif
+
         // Mac specific
-        m_modifierFlags                     = [event modifierFlags];
-        m_eventNumber                       = [event eventNumber];
+        m_modifierFlags = [event modifierFlags];
+        m_eventNumber = [event eventNumber];
+        m_menuTypeForEvent = typeForEvent(event);
     }
 };
 
-PlatformMouseEvent PlatformEventFactory::createPlatformMouseEvent(NSEvent *event, NSView *windowView)
+PlatformMouseEvent PlatformEventFactory::createPlatformMouseEvent(NSEvent *event, NSEvent *correspondingPressureEvent, NSView *windowView)
 {
-    return PlatformMouseEventBuilder(event, windowView);
+    return PlatformMouseEventBuilder(event, correspondingPressureEvent, windowView);
 }
 
 
@@ -480,12 +499,7 @@ public:
         m_phase                             = phaseForEvent(event);
         m_momentumPhase                     = momentumPhaseForEvent(event);
         m_hasPreciseScrollingDeltas         = continuous;
-
-#if HAVE(INVERTED_WHEEL_EVENTS)
         m_directionInvertedFromDevice       = [event isDirectionInvertedFromDevice];
-#else
-        m_directionInvertedFromDevice       = false;
-#endif
     }
 };
 
@@ -542,29 +556,5 @@ PlatformKeyboardEvent PlatformEventFactory::createPlatformKeyboardEvent(NSEvent 
 {
     return PlatformKeyboardEventBuilder(event);
 }
-
-#if ENABLE(GESTURE_EVENTS)
-class PlatformGestureEventBuilder : public PlatformGestureEvent {
-public:
-    PlatformGestureEventBuilder(NSEvent *event, NSView *windowView)
-    {
-        // PlatformEvent
-        m_type                              = gestureEventTypeForEvent(event);
-        m_modifiers                         = modifiersForEvent(event);
-        m_timestamp                         = eventTimeStampSince1970(event);
-
-        // PlatformGestureEvent
-        m_position                          = pointForEvent(event, windowView);
-        m_globalPosition                    = globalPointForEvent(event);
-        m_deltaX                            = 0;
-        m_deltaY                            = 0;
-    }
-};
-
-PlatformGestureEvent PlatformEventFactory::createPlatformGestureEvent(NSEvent *event, NSView *windowView)
-{
-    return PlatformGestureEventBuilder(event, windowView);
-}
-#endif
 
 } // namespace WebCore

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,10 +27,22 @@
 #import "DragController.h"
 
 #if ENABLE(DRAG_SUPPORT)
+
+#import "DataTransfer.h"
+#import "Document.h"
+#import "DocumentFragment.h"
+#import "DragClient.h"
 #import "DragData.h"
-#import "Frame.h"
+#import "Editor.h"
+#import "EditorClient.h"
+#import "Element.h"
+#import "File.h"
 #import "FrameView.h"
+#import "HTMLAttachmentElement.h"
+#import "MainFrame.h"
 #import "Page.h"
+#import "Pasteboard.h"
+#import "Range.h"
 
 namespace WebCore {
 
@@ -42,19 +54,17 @@ const int DragController::DragIconBottomInset = 3;
 
 const float DragController::DragImageAlpha = 0.75f;
 
-bool DragController::isCopyKeyDown(DragData* dragData)
+bool DragController::isCopyKeyDown(DragData& dragData)
 {
-    return dragData->flags() & DragApplicationIsCopyKeyDown;
+    return dragData.flags() & DragApplicationIsCopyKeyDown;
 }
     
-DragOperation DragController::dragOperation(DragData* dragData)
+DragOperation DragController::dragOperation(DragData& dragData)
 {
-    ASSERT(dragData);
-
-    if ((dragData->flags() & DragApplicationIsModal) || !dragData->containsURL(m_page->mainFrame()))
+    if ((dragData.flags() & DragApplicationIsModal) || !dragData.containsURL())
         return DragOperationNone;
 
-    if (!m_documentUnderMouse || (!(dragData->flags() & (DragApplicationHasAttachedSheet | DragApplicationIsSource))))
+    if (!m_documentUnderMouse || (!(dragData.flags() & (DragApplicationHasAttachedSheet | DragApplicationIsSource))))
         return DragOperationCopy;
 
     return DragOperationNone;
@@ -75,8 +85,21 @@ void DragController::cleanupAfterSystemDrag()
     // call it anyway to be on the safe side.
     // We don't want to do this for WebKit2, since the client call to start the drag
     // is asynchronous.
-    if (m_page->mainFrame()->view()->platformWidget())
+    if (m_page.mainFrame().view()->platformWidget())
         dragEnded();
+}
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+void DragController::declareAndWriteAttachment(DataTransfer& dataTransfer, Element& element, const URL& url)
+{
+    const HTMLAttachmentElement& attachment = downcast<HTMLAttachmentElement>(element);
+    m_client.declareAndWriteAttachment(dataTransfer.pasteboard().name(), element, url, attachment.file()->path(), element.document().frame());
+}
+#endif
+    
+void DragController::declareAndWriteDragImage(DataTransfer& dataTransfer, Element& element, const URL& url, const String& label)
+{
+    m_client.declareAndWriteDragImage(dataTransfer.pasteboard().name(), element, url, label, element.document().frame());
 }
 
 } // namespace WebCore

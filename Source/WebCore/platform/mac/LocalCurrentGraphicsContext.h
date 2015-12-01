@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,11 +29,11 @@ namespace WebCore {
 class LocalCurrentGraphicsContext {
     WTF_MAKE_NONCOPYABLE(LocalCurrentGraphicsContext);
 public:
-    LocalCurrentGraphicsContext(GraphicsContext* graphicsContext);
+    LocalCurrentGraphicsContext(GraphicsContext&);
     ~LocalCurrentGraphicsContext();
     CGContextRef cgContext();
 private:
-    GraphicsContext* m_savedGraphicsContext;
+    GraphicsContext& m_savedGraphicsContext;
     NSGraphicsContext* m_savedNSGraphicsContext;
     bool m_didSetGraphicsContext;
 };
@@ -41,8 +41,8 @@ private:
 class ContextContainer {
     WTF_MAKE_NONCOPYABLE(ContextContainer);
 public:
-    ContextContainer(GraphicsContext* graphicsContext)
-        : m_graphicsContext(graphicsContext->platformContext())
+    ContextContainer(GraphicsContext& graphicsContext)
+        : m_graphicsContext(graphicsContext.platformContext())
     {
     }
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,160 +30,181 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
-
 #include "WorkerInspectorController.h"
 
-#include "InjectedScriptHost.h"
-#include "InjectedScriptManager.h"
-#include "InspectorBackendDispatcher.h"
-#include "InspectorClient.h"
-#include "InspectorConsoleAgent.h"
-#include "InspectorFrontend.h"
-#include "InspectorFrontendChannel.h"
-#include "InspectorHeapProfilerAgent.h"
-#include "InspectorProfilerAgent.h"
-#include "InspectorState.h"
-#include "InspectorStateClient.h"
+#include "CommandLineAPIHost.h"
+#include "InspectorInstrumentation.h"
 #include "InspectorTimelineAgent.h"
 #include "InstrumentingAgents.h"
+#include "JSDOMWindowBase.h"
+#include "JSMainThreadExecState.h"
+#include "WebInjectedScriptHost.h"
+#include "WebInjectedScriptManager.h"
 #include "WorkerConsoleAgent.h"
 #include "WorkerDebuggerAgent.h"
 #include "WorkerGlobalScope.h"
 #include "WorkerReportingProxy.h"
 #include "WorkerRuntimeAgent.h"
 #include "WorkerThread.h"
-#include <wtf/PassOwnPtr.h>
+#include <inspector/InspectorBackendDispatcher.h>
+#include <inspector/InspectorFrontendChannel.h>
+#include <inspector/InspectorFrontendDispatchers.h>
+#include <inspector/InspectorFrontendRouter.h>
+#include <wtf/Stopwatch.h>
+
+using namespace JSC;
+using namespace Inspector;
 
 namespace WebCore {
 
 namespace {
 
-class PageInspectorProxy : public InspectorFrontendChannel {
+class PageInspectorProxy : public FrontendChannel {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit PageInspectorProxy(WorkerGlobalScope* workerGlobalScope) : m_workerGlobalScope(workerGlobalScope) { }
+    explicit PageInspectorProxy(WorkerGlobalScope& workerGlobalScope)
+        : m_workerGlobalScope(workerGlobalScope) { }
     virtual ~PageInspectorProxy() { }
+
+    virtual ConnectionType connectionType() const override { return ConnectionType::Local; }
 private:
-    virtual bool sendMessageToFrontend(const String& message)
+    virtual bool sendMessageToFrontend(const String& message) override
     {
-        m_workerGlobalScope->thread()->workerReportingProxy().postMessageToPageInspector(message);
+        m_workerGlobalScope.thread().workerReportingProxy().postMessageToPageInspector(message);
         return true;
     }
-    WorkerGlobalScope* m_workerGlobalScope;
-};
-
-class WorkerStateClient : public InspectorStateClient {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    WorkerStateClient(WorkerGlobalScope* context) : m_workerGlobalScope(context) { }
-    virtual ~WorkerStateClient() { }
-
-private:
-    virtual bool supportsInspectorStateUpdates() const { return true; }
-    virtual void updateInspectorStateCookie(const String& cookie)
-    {
-        m_workerGlobalScope->thread()->workerReportingProxy().updateInspectorStateCookie(cookie);
-    }
-
-    WorkerGlobalScope* m_workerGlobalScope;
+    WorkerGlobalScope& m_workerGlobalScope;
 };
 
 }
 
-WorkerInspectorController::WorkerInspectorController(WorkerGlobalScope* workerGlobalScope)
+WorkerInspectorController::WorkerInspectorController(WorkerGlobalScope& workerGlobalScope)
     : m_workerGlobalScope(workerGlobalScope)
-    , m_stateClient(adoptPtr(new WorkerStateClient(workerGlobalScope)))
-    , m_state(adoptPtr(new InspectorCompositeState(m_stateClient.get())))
-    , m_instrumentingAgents(InstrumentingAgents::create())
-    , m_injectedScriptManager(InjectedScriptManager::createForWorker())
-    , m_runtimeAgent(0)
+    , m_instrumentingAgents(InstrumentingAgents::create(*this))
+    , m_injectedScriptManager(std::make_unique<WebInjectedScriptManager>(*this, WebInjectedScriptHost::create()))
+    , m_executionStopwatch(Stopwatch::create())
+    , m_scriptDebugServer(workerGlobalScope, WorkerDebuggerAgent::debuggerTaskMode)
+    , m_frontendRouter(FrontendRouter::create())
+    , m_backendDispatcher(BackendDispatcher::create(m_frontendRouter.copyRef()))
 {
-    OwnPtr<InspectorRuntimeAgent> runtimeAgent = WorkerRuntimeAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get(), workerGlobalScope);
+    AgentContext baseContext = {
+        *this,
+        *m_injectedScriptManager,
+        m_frontendRouter.get(),
+        m_backendDispatcher.get()
+    };
+
+    WebAgentContext webContext = {
+        baseContext,
+        m_instrumentingAgents.get()
+    };
+
+    WorkerAgentContext workerContext = {
+        webContext,
+        workerGlobalScope,
+    };
+
+    auto runtimeAgent = std::make_unique<WorkerRuntimeAgent>(workerContext);
     m_runtimeAgent = runtimeAgent.get();
-    m_agents.append(runtimeAgent.release());
+    m_instrumentingAgents->setWorkerRuntimeAgent(m_runtimeAgent);
+    m_agents.append(WTF::move(runtimeAgent));
 
-    OwnPtr<InspectorConsoleAgent> consoleAgent = WorkerConsoleAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get());
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    OwnPtr<InspectorDebuggerAgent> debuggerAgent = WorkerDebuggerAgent::create(m_instrumentingAgents.get(), m_state.get(), workerGlobalScope, m_injectedScriptManager.get());
-    InspectorDebuggerAgent* debuggerAgentPtr = debuggerAgent.get();
-    m_runtimeAgent->setScriptDebugServer(&debuggerAgent->scriptDebugServer());
-    m_agents.append(debuggerAgent.release());
+    auto consoleAgent = std::make_unique<WorkerConsoleAgent>(workerContext);
+    m_instrumentingAgents->setWebConsoleAgent(consoleAgent.get());
 
-    m_agents.append(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent.get(), workerGlobalScope, m_state.get(), m_injectedScriptManager.get()));
-    m_agents.append(InspectorHeapProfilerAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get()));
-#endif
-    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), 0, 0, m_state.get(), InspectorTimelineAgent::WorkerInspector, 0));
-    m_agents.append(consoleAgent.release());
+    auto debuggerAgent = std::make_unique<WorkerDebuggerAgent>(workerContext);
+    m_agents.append(WTF::move(debuggerAgent));
 
-    m_injectedScriptManager->injectedScriptHost()->init(0
-        , 0
-#if ENABLE(SQL_DATABASE)
-        , 0
-#endif
-        , 0
-        , 0
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-        , debuggerAgentPtr
-#endif
-    );
+    m_agents.append(std::make_unique<InspectorTimelineAgent>(workerContext, nullptr, InspectorTimelineAgent::WorkerInspector));
+    m_agents.append(WTF::move(consoleAgent));
+
+    if (CommandLineAPIHost* commandLineAPIHost = m_injectedScriptManager->commandLineAPIHost()) {
+        commandLineAPIHost->init(nullptr
+            , nullptr
+            , nullptr
+            , nullptr
+            , nullptr
+        );
+    }
 }
  
 WorkerInspectorController::~WorkerInspectorController()
 {
+    ASSERT(!m_frontendRouter->hasFrontends());
+    ASSERT(!m_forwardingChannel);
+
     m_instrumentingAgents->reset();
-    disconnectFrontend();
 }
 
 void WorkerInspectorController::connectFrontend()
 {
-    ASSERT(!m_frontend);
-    m_state->unmute();
-    m_frontendChannel = adoptPtr(new PageInspectorProxy(m_workerGlobalScope));
-    m_frontend = adoptPtr(new InspectorFrontend(m_frontendChannel.get()));
-    m_backendDispatcher = InspectorBackendDispatcher::create(m_frontendChannel.get());
-    m_agents.registerInDispatcher(m_backendDispatcher.get());
-    m_agents.setFrontend(m_frontend.get());
+    ASSERT(!m_frontendRouter->hasFrontends());
+    ASSERT(!m_forwardingChannel);
+
+    m_forwardingChannel = std::make_unique<PageInspectorProxy>(m_workerGlobalScope);
+    m_frontendRouter->connectFrontend(m_forwardingChannel.get());
+    m_agents.didCreateFrontendAndBackend(&m_frontendRouter.get(), &m_backendDispatcher.get());
 }
 
-void WorkerInspectorController::disconnectFrontend()
+void WorkerInspectorController::disconnectFrontend(Inspector::DisconnectReason reason)
 {
-    if (!m_frontend)
-        return;
-    m_backendDispatcher->clearFrontend();
-    m_backendDispatcher.clear();
-    // Destroying agents would change the state, but we don't want that.
-    // Pre-disconnect state will be used to restore inspector agents.
-    m_state->mute();
-    m_agents.clearFrontend();
-    m_frontend.clear();
-    m_frontendChannel.clear();
-}
+    ASSERT(m_frontendRouter->hasFrontends());
+    ASSERT(m_forwardingChannel);
 
-void WorkerInspectorController::restoreInspectorStateFromCookie(const String& inspectorCookie)
-{
-    ASSERT(!m_frontend);
-    connectFrontend();
-    m_state->loadFromCookie(inspectorCookie);
-
-    m_agents.restore();
+    m_agents.willDestroyFrontendAndBackend(reason);
+    m_frontendRouter->disconnectFrontend(m_forwardingChannel.get());
+    m_forwardingChannel = nullptr;
 }
 
 void WorkerInspectorController::dispatchMessageFromFrontend(const String& message)
 {
-    if (m_backendDispatcher)
-        m_backendDispatcher->dispatch(message);
+    m_backendDispatcher->dispatch(message);
 }
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void WorkerInspectorController::resume()
 {
     ErrorString unused;
-    m_runtimeAgent->run(&unused);
-}
-#endif
-
+    m_runtimeAgent->run(unused);
 }
 
-#endif
+InspectorFunctionCallHandler WorkerInspectorController::functionCallHandler() const
+{
+    return WebCore::functionCallHandlerFromAnyThread;
+}
+
+InspectorEvaluateHandler WorkerInspectorController::evaluateHandler() const
+{
+    return WebCore::evaluateHandlerFromAnyThread;
+}
+
+void WorkerInspectorController::willCallInjectedScriptFunction(JSC::ExecState* scriptState, const String& scriptName, int scriptLine)
+{
+    ScriptExecutionContext* scriptExecutionContext = scriptExecutionContextFromExecState(scriptState);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willCallFunction(scriptExecutionContext, scriptName, scriptLine);
+    m_injectedScriptInstrumentationCookies.append(cookie);
+}
+
+void WorkerInspectorController::didCallInjectedScriptFunction(JSC::ExecState* scriptState)
+{
+    ASSERT(!m_injectedScriptInstrumentationCookies.isEmpty());
+    ScriptExecutionContext* scriptExecutionContext = scriptExecutionContextFromExecState(scriptState);
+    InspectorInstrumentationCookie cookie = m_injectedScriptInstrumentationCookies.takeLast();
+    InspectorInstrumentation::didCallFunction(cookie, scriptExecutionContext);
+}
+
+Ref<Stopwatch> WorkerInspectorController::executionStopwatch()
+{
+    return m_executionStopwatch.copyRef();
+}
+
+WorkerScriptDebugServer& WorkerInspectorController::scriptDebugServer()
+{
+    return m_scriptDebugServer;
+}
+
+VM& WorkerInspectorController::vm()
+{
+    return m_workerGlobalScope.vm();
+}
+
+} // namespace WebCore

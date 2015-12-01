@@ -31,6 +31,7 @@
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
 #include "Page.h"
+#include "RenderElement.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
 
@@ -43,40 +44,39 @@ BaseChooserOnlyDateAndTimeInputType::~BaseChooserOnlyDateAndTimeInputType()
 
 void BaseChooserOnlyDateAndTimeInputType::handleDOMActivateEvent(Event*)
 {
-    if (element()->isDisabledOrReadOnly() || !element()->renderer() || !ScriptController::processingUserGesture())
+    if (element().isDisabledOrReadOnly() || !element().renderer() || !ScriptController::processingUserGesture())
         return;
 
     if (m_dateTimeChooser)
         return;
-    if (!element()->document()->page())
+    if (!element().document().page())
         return;
     DateTimeChooserParameters parameters;
-    if (!element()->setupDateTimeChooserParameters(parameters))
+    if (!element().setupDateTimeChooserParameters(parameters))
         return;
-    m_dateTimeChooser = element()->document()->page()->chrome().openDateTimeChooser(this, parameters);
 }
 
 void BaseChooserOnlyDateAndTimeInputType::createShadowSubtree()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, valueContainerPseudo, ("-webkit-date-and-time-value", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, valueContainerPseudo, ("-webkit-date-and-time-value", AtomicString::ConstructFromLiteral));
 
-    RefPtr<HTMLDivElement> valueContainer = HTMLDivElement::create(element()->document());
+    Ref<HTMLDivElement> valueContainer = HTMLDivElement::create(element().document());
     valueContainer->setPseudo(valueContainerPseudo);
-    element()->userAgentShadowRoot()->appendChild(valueContainer.get());
+    element().userAgentShadowRoot()->appendChild(WTF::move(valueContainer));
     updateAppearance();
 }
 
 void BaseChooserOnlyDateAndTimeInputType::updateAppearance()
 {
-    Node* node = element()->userAgentShadowRoot()->firstChild();
-    if (!node || !node->isHTMLElement())
+    Node* node = element().userAgentShadowRoot()->firstChild();
+    if (!is<HTMLElement>(node))
         return;
     String displayValue = visibleValue();
     if (displayValue.isEmpty()) {
         // Need to put something to keep text baseline.
         displayValue = ASCIILiteral(" ");
     }
-    toHTMLElement(node)->setInnerText(displayValue, ASSERT_NO_EXCEPTION);
+    downcast<HTMLElement>(*node).setInnerText(displayValue, ASSERT_NO_EXCEPTION);
 }
 
 void BaseChooserOnlyDateAndTimeInputType::setValue(const String& value, bool valueChanged, TextFieldEventBehavior eventBehavior)
@@ -93,12 +93,12 @@ void BaseChooserOnlyDateAndTimeInputType::detach()
 
 void BaseChooserOnlyDateAndTimeInputType::didChooseValue(const String& value)
 {
-    element()->setValue(value, DispatchInputAndChangeEvent);
+    element().setValue(value, DispatchInputAndChangeEvent);
 }
 
 void BaseChooserOnlyDateAndTimeInputType::didEndChooser()
 {
-    m_dateTimeChooser.clear();
+    m_dateTimeChooser = nullptr;
 }
 
 void BaseChooserOnlyDateAndTimeInputType::closeDateTimeChooser()
@@ -130,7 +130,7 @@ void BaseChooserOnlyDateAndTimeInputType::accessKeyAction(bool sendMouseEvents)
 
 bool BaseChooserOnlyDateAndTimeInputType::isMouseFocusable() const
 {
-    return element()->isTextFormControlFocusable();
+    return element().isTextFormControlFocusable();
 }
 
 }

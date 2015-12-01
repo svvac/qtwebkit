@@ -21,7 +21,7 @@
 #define GRefPtrGStreamer_h
 #if USE(GSTREAMER)
 
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 
 typedef struct _GstElement GstElement;
 typedef struct _GstPad GstPad;
@@ -31,6 +31,13 @@ typedef struct _GstTask GstTask;
 typedef struct _GstBus GstBus;
 typedef struct _GstElementFactory GstElementFactory;
 typedef struct _GstBuffer GstBuffer;
+typedef struct _GstSample GstSample;
+typedef struct _GstTagList GstTagList;
+typedef struct _GstEvent GstEvent;
+typedef struct _GstToc GstToc;
+typedef struct _GstMessage GstMessage;
+typedef struct _WebKitVideoSink WebKitVideoSink;
+typedef struct _WebKitWebSrc WebKitWebSrc;
 
 namespace WTF {
 
@@ -65,7 +72,37 @@ template<> void derefGPtr<GstElementFactory>(GstElementFactory* ptr);
 template<> GRefPtr<GstBuffer> adoptGRef(GstBuffer* ptr);
 template<> GstBuffer* refGPtr<GstBuffer>(GstBuffer* ptr);
 template<> void derefGPtr<GstBuffer>(GstBuffer* ptr);
-}
+
+template<> GRefPtr<GstSample> adoptGRef(GstSample* ptr);
+template<> GstSample* refGPtr<GstSample>(GstSample* ptr);
+template<> void derefGPtr<GstSample>(GstSample* ptr);
+
+template<> GRefPtr<GstTagList> adoptGRef(GstTagList* ptr);
+template<> GstTagList* refGPtr<GstTagList>(GstTagList* ptr);
+template<> void derefGPtr<GstTagList>(GstTagList* ptr);
+
+template<> GRefPtr<GstEvent> adoptGRef(GstEvent* ptr);
+template<> GstEvent* refGPtr<GstEvent>(GstEvent* ptr);
+template<> void derefGPtr<GstEvent>(GstEvent* ptr);
+
+template<> GRefPtr<GstToc> adoptGRef(GstToc* ptr);
+template<> GstToc* refGPtr<GstToc>(GstToc* ptr);
+template<> void derefGPtr<GstToc>(GstToc* ptr);
+
+template<> GRefPtr<GstMessage> adoptGRef(GstMessage*);
+template<> GstMessage* refGPtr<GstMessage>(GstMessage*);
+template<> void derefGPtr<GstMessage>(GstMessage*);
+
+template<> GRefPtr<WebKitVideoSink> adoptGRef(WebKitVideoSink* ptr);
+template<> WebKitVideoSink* refGPtr<WebKitVideoSink>(WebKitVideoSink* ptr);
+template<> void derefGPtr<WebKitVideoSink>(WebKitVideoSink* ptr);
+
+template<> GRefPtr<WebKitWebSrc> adoptGRef(WebKitWebSrc* ptr);
+template<> WebKitWebSrc* refGPtr<WebKitWebSrc>(WebKitWebSrc* ptr);
+template<> void derefGPtr<WebKitWebSrc>(WebKitWebSrc* ptr);
+
+} // namespace WTF
 
 #endif // USE(GSTREAMER)
-#endif
+
+#endif // GRefPtrGStreamer_h

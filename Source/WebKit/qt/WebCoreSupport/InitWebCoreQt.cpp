@@ -34,7 +34,6 @@
 #include "ChromeClientQt.h"
 #include "Font.h"
 #include "Image.h"
-#include "InitializeLogging.h"
 #include "MemoryCache.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -62,18 +61,18 @@ Q_DECL_EXPORT void setWebKitWidgetsInitCallback(QtStyleFacadeFactoryFunction cal
 static WebCore::QStyleFacade* createStyleForPage(WebCore::Page* page)
 {
     QWebPageAdapter* pageAdapter = 0;
-    if (page)
-        pageAdapter = static_cast<WebCore::ChromeClientQt*>(page->chrome().client())->m_webPage;
-    return initCallback(pageAdapter);
+    //if (page)
+    //    pageAdapter = static_cast<WebCore::ChromeClientQt>(page->chrome().client()).m_webPage;
+    //return initCallback(pageAdapter);
 }
 
 // Called also from WebKit2's WebProcess
 Q_DECL_EXPORT void initializeWebKitQt()
 {
     if (initCallback) {
-        WebCore::RenderThemeQStyle::setStyleFactoryFunction(createStyleForPage);
+        //WebCore::RenderThemeQStyle::setStyleFactoryFunction(createStyleForPage);
         WebCore::RenderThemeQt::setCustomTheme(WebCore::RenderThemeQStyle::create, new WebCore::ScrollbarThemeQStyle);
-        WebCore::Font::setDefaultTypesettingFeatures(WebCore::Kerning);
+        //WebCore::Font::setDefaultTypesettingFeatures(WebCore::Kerning);
     }
 }
 
@@ -93,7 +92,7 @@ Q_DECL_EXPORT void initializeWebCoreQt()
         return;
 
 #if !LOG_DISABLED
-    WebCore::initializeLoggingChannelsIfNecessary();
+    //WebCore::initializeLoggingChannelsIfNecessary();
 #endif // !LOG_DISABLED
     ScriptController::initializeThreading();
     WTF::initializeMainThread();
@@ -102,10 +101,9 @@ Q_DECL_EXPORT void initializeWebCoreQt()
     PlatformStrategiesQt::initialize();
     QtWebElementRuntime::initialize();
 
-    if (!WebCore::memoryCache()->disabled())
-        WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(60);
-    WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(true);
-    WebCore::Settings::setDefaultMinDOMTimerInterval(0.004);
+    //if (!WebCore::MemoryCache::singleton().disabled())
+    //    WebCore::MemoryCache::singleton().setDeadDecodedDataDeletionInterval(std::chrono::duration_cast<int>(60));
+    //WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(true);
 
     initialized = true;
 }

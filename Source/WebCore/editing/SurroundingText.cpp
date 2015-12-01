@@ -32,9 +32,7 @@
 #include "SurroundingText.h"
 
 #include "Document.h"
-#include "Range.h"
 #include "TextIterator.h"
-#include "VisiblePosition.h"
 #include "VisibleSelection.h"
 #include "VisibleUnits.h"
 
@@ -47,19 +45,21 @@ SurroundingText::SurroundingText(const VisiblePosition& visiblePosition, unsigne
         return;
 
     const unsigned halfMaxLength = maxLength / 2;
-    CharacterIterator forwardIterator(makeRange(visiblePosition, endOfDocument(visiblePosition)).get(), TextIteratorStopsOnFormControls);
+    PassRefPtr<Range> range = makeRange(visiblePosition, endOfDocument(visiblePosition));
+    CharacterIterator forwardIterator(*range.get(), TextIteratorStopsOnFormControls);
     if (!forwardIterator.atEnd())
         forwardIterator.advance(maxLength - halfMaxLength);
 
     Position position = visiblePosition.deepEquivalent().parentAnchoredEquivalent();
     Document* document = position.document();
     RefPtr<Range> forwardRange = forwardIterator.range();
-    if (!forwardRange || !Range::create(document, position, forwardRange->startPosition())->text().length()) {
+    if (!forwardRange || !Range::create(*document, position, forwardRange->startPosition())->text().length()) {
         ASSERT(forwardRange);
         return;
     }
 
-    BackwardsCharacterIterator backwardsIterator(makeRange(startOfDocument(visiblePosition), visiblePosition).get(), TextIteratorStopsOnFormControls);
+    PassRefPtr<Range> backwardRange = makeRange(startOfDocument(visiblePosition), visiblePosition);
+    BackwardsCharacterIterator backwardsIterator(*backwardRange.get(), TextIteratorStopsOnFormControls);
     if (!backwardsIterator.atEnd())
         backwardsIterator.advance(halfMaxLength);
 
@@ -69,8 +69,8 @@ SurroundingText::SurroundingText(const VisiblePosition& visiblePosition, unsigne
         return;
     }
 
-    m_positionOffsetInContent = Range::create(document, backwardsRange->endPosition(), position)->text().length();
-    m_contentRange = Range::create(document, backwardsRange->endPosition(), forwardRange->startPosition());
+    m_positionOffsetInContent = Range::create(*document, backwardsRange->endPosition(), position)->text().length();
+    m_contentRange = Range::create(*document, backwardsRange->endPosition(), forwardRange->startPosition());
     ASSERT(m_contentRange);
 }
 
@@ -79,7 +79,7 @@ PassRefPtr<Range> SurroundingText::rangeFromContentOffsets(unsigned startOffsetI
     if (startOffsetInContent >= endOffsetInContent || endOffsetInContent > content().length())
         return 0;
 
-    CharacterIterator iterator(m_contentRange.get());
+    CharacterIterator iterator(*m_contentRange.get());
 
     ASSERT(!iterator.atEnd());
     iterator.advance(startOffsetInContent);
@@ -93,7 +93,7 @@ PassRefPtr<Range> SurroundingText::rangeFromContentOffsets(unsigned startOffsetI
     ASSERT(iterator.range());
     Position end = iterator.range()->startPosition();
 
-    return Range::create(start.document(), start, end);
+    return Range::create(*start.document(), start, end);
 }
 
 String SurroundingText::content() const

@@ -27,6 +27,7 @@
 #ifndef AccessibilityObjectWrapperWin_h
 #define AccessibilityObjectWrapperWin_h
 
+#include <unknwn.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
@@ -48,7 +49,7 @@ namespace WebCore {
 
     protected:
         AccessibilityObjectWrapper(AccessibilityObject* obj) : m_object(obj) { }
-        AccessibilityObjectWrapper() : m_object(0) { }
+        AccessibilityObjectWrapper() : m_object(nullptr) { }
 
         AccessibilityObject* m_object;
     };

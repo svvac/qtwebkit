@@ -8,16 +8,21 @@
 SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/WebCore
 
 QT *= network sql core-private gui-private
+CONFIG += no_batch
 
 WEBCORE_GENERATED_SOURCES_DIR = $${ROOT_BUILD_DIR}/Source/WebCore/$${GENERATED_SOURCES_DESTDIR}
 
 INCLUDEPATH += \
     $$SOURCE_DIR \
-    $$SOURCE_DIR/Modules/filesystem \
     $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/Modules/indexeddb \
+    $$SOURCE_DIR/Modules/indexeddb/legacy \
+    $$SOURCE_DIR/Modules/indexeddb/client \
+    $$SOURCE_DIR/Modules/indexeddb/server \
+    $$SOURCE_DIR/Modules/indexeddb/shared \
     $$SOURCE_DIR/Modules/navigatorcontentutils \
     $$SOURCE_DIR/Modules/notifications \
+    $$SOURCE_DIR/Modules/plugins \
     $$SOURCE_DIR/Modules/proximity \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
@@ -28,7 +33,13 @@ INCLUDEPATH += \
     $$SOURCE_DIR/bindings/generic \
     $$SOURCE_DIR/bridge \
     $$SOURCE_DIR/bridge/qt \
+    $$SOURCE_DIR/contentextensions \
+    $$SOURCE_DIR/crypto \
+    $$SOURCE_DIR/crypto/algorithms \
+    $$SOURCE_DIR/crypto/keys \
+    $$SOURCE_DIR/crypto/parameters \
     $$SOURCE_DIR/css \
+    $$SOURCE_DIR/cssjit \
     $$SOURCE_DIR/dom \
     $$SOURCE_DIR/dom/default \
     $$SOURCE_DIR/editing \
@@ -81,14 +92,18 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/qt \
     $$SOURCE_DIR/platform/sql \
     $$SOURCE_DIR/platform/text \
+    $$SOURCE_DIR/platform/text/icu \
     $$SOURCE_DIR/platform/text/transcoder \
     $$SOURCE_DIR/plugins \
     $$SOURCE_DIR/rendering \
+    $$SOURCE_DIR/rendering/line \
     $$SOURCE_DIR/rendering/mathml \
     $$SOURCE_DIR/rendering/shapes \
     $$SOURCE_DIR/rendering/style \
     $$SOURCE_DIR/rendering/svg \
+    $$SOURCE_DIR/replay \
     $$SOURCE_DIR/storage \
+    $$SOURCE_DIR/style \
     $$SOURCE_DIR/svg \
     $$SOURCE_DIR/svg/animation \
     $$SOURCE_DIR/svg/graphics \

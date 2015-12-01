@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,8 +25,6 @@
 
 #include "config.h"
 #include "WKCACFViewLayerTreeHost.h"
-
-#if USE(ACCELERATED_COMPOSITING)
 
 #include "PlatformCALayer.h"
 #include "SoftLinking.h"
@@ -54,6 +52,7 @@ SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewSetLayer, void, __cdecl, (WKCACFV
 SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewUpdate, void, __cdecl, (WKCACFViewRef view, HWND window, const CGRect* bounds), (view, window, bounds))
 SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewCanDraw, bool, __cdecl, (WKCACFViewRef view), (view))
 SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewDraw, void, __cdecl, (WKCACFViewRef view), (view))
+SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewDrawIntoDC, void, __cdecl, (WKCACFViewRef view, HDC dc), (view, dc))
 SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewFlushContext, void, __cdecl, (WKCACFViewRef view), (view))
 SOFT_LINK(WebKitQuartzCoreAdditions, WKCACFViewInvalidateRects, void, __cdecl, (WKCACFViewRef view, const CGRect rects[], size_t count), (view, rects, count))
 typedef void (*WKCACFViewContextDidChangeCallback)(WKCACFViewRef view, void* info);
@@ -158,16 +157,19 @@ void WKCACFViewLayerTreeHost::flushContext()
     WKCACFViewFlushContext(m_view.get());
 }
 
-void WKCACFViewLayerTreeHost::paint()
+void WKCACFViewLayerTreeHost::paint(HDC dc)
 {
     updateViewIfNeeded();
-    CACFLayerTreeHost::paint();
+    CACFLayerTreeHost::paint(dc);
 }
 
-void WKCACFViewLayerTreeHost::render(const Vector<CGRect>& dirtyRects)
+void WKCACFViewLayerTreeHost::render(const Vector<CGRect>& dirtyRects, HDC dc)
 {
     WKCACFViewInvalidateRects(m_view.get(), dirtyRects.data(), dirtyRects.size());
-    WKCACFViewDraw(m_view.get());
+    if (dc)
+        WKCACFViewDrawIntoDC(m_view.get(), dc);
+    else
+        WKCACFViewDraw(m_view.get());
 }
 
 void WKCACFViewLayerTreeHost::setShouldInvertColors(bool shouldInvertColors)
@@ -187,5 +189,3 @@ GraphicsDeviceAdapter* WKCACFViewLayerTreeHost::graphicsDeviceAdapter() const
 #endif
 
 } // namespace WebCore
-
-#endif // USE(ACCELERATED_COMPOSITING)

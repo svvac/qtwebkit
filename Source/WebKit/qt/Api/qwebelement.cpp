@@ -32,7 +32,6 @@
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HTMLElement.h"
-#include "StylePropertySet.h"
 #include "StyleRule.h"
 #include "Completion.h"
 #include "JSGlobalObject.h"
@@ -255,7 +254,7 @@ QWebElement QWebElement::findFirst(const QString &selectorQuery) const
     if (!m_element)
         return QWebElement();
     ExceptionCode exception = 0; // ###
-    return QWebElement(m_element->querySelector(selectorQuery, exception).get());
+    return QWebElement(m_element->querySelector(selectorQuery, exception));
 }
 
 /*!
@@ -507,9 +506,9 @@ QStringList QWebElement::attributeNames(const QString& namespaceUri) const
         const String namespaceUriString(namespaceUri); // convert QString -> String once
         const unsigned attrsCount = m_element->attributeCount();
         for (unsigned i = 0; i < attrsCount; ++i) {
-            const Attribute* const attribute = m_element->attributeItem(i);
-            if (namespaceUriString == attribute->namespaceURI())
-                attributeNameList.append(attribute->localName());
+            const Attribute& attribute = m_element->attributeAt(i);
+            if (namespaceUriString == attribute.namespaceURI())
+                attributeNameList.append(attribute.localName());
         }
     }
     return attributeNameList;
@@ -524,9 +523,7 @@ bool QWebElement::hasFocus() const
 {
     if (!m_element)
         return false;
-    if (m_element->document())
-        return m_element == m_element->document()->focusedElement();
-    return false;
+    return m_element == m_element->document().focusedElement();
 }
 
 /*!
@@ -538,8 +535,8 @@ void QWebElement::setFocus()
 {
     if (!m_element)
         return;
-    if (m_element->document() && m_element->isFocusable())
-        m_element->document()->setFocusedElement(m_element);
+    if (m_element->isFocusable())
+        m_element->document().setFocusedElement(m_element);
 }
 
 /*!
@@ -551,7 +548,8 @@ QRect QWebElement::geometry() const
 {
     if (!m_element)
         return QRect();
-    return m_element->pixelSnappedBoundingBox();
+    bool isReplaced;
+    return m_element->pixelSnappedRenderRect(&isReplaced);
 }
 
 /*!
@@ -617,6 +615,8 @@ QWebElement QWebElement::parent() const
 */
 QWebElement QWebElement::firstChild() const
 {
+    notImplemented();
+    /*
     if (!m_element)
         return QWebElement();
     for (Node* child = m_element->firstChild(); child; child = child->nextSibling()) {
@@ -625,6 +625,7 @@ QWebElement QWebElement::firstChild() const
         Element* e = toElement(child);
         return QWebElement(e);
     }
+    */
     return QWebElement();
 }
 
@@ -635,6 +636,8 @@ QWebElement QWebElement::firstChild() const
 */
 QWebElement QWebElement::lastChild() const
 {
+    notImplemented();
+    /*
     if (!m_element)
         return QWebElement();
     for (Node* child = m_element->lastChild(); child; child = child->previousSibling()) {
@@ -643,6 +646,7 @@ QWebElement QWebElement::lastChild() const
         Element* e = toElement(child);
         return QWebElement(e);
     }
+    */
     return QWebElement();
 }
 
@@ -653,6 +657,8 @@ QWebElement QWebElement::lastChild() const
 */
 QWebElement QWebElement::nextSibling() const
 {
+    notImplemented();
+    /*
     if (!m_element)
         return QWebElement();
     for (Node* sib = m_element->nextSibling(); sib; sib = sib->nextSibling()) {
@@ -661,6 +667,7 @@ QWebElement QWebElement::nextSibling() const
         Element* e = toElement(sib);
         return QWebElement(e);
     }
+    */
     return QWebElement();
 }
 
@@ -671,6 +678,8 @@ QWebElement QWebElement::nextSibling() const
 */
 QWebElement QWebElement::previousSibling() const
 {
+    notImplemented();
+    /*
     if (!m_element)
         return QWebElement();
     for (Node* sib = m_element->previousSibling(); sib; sib = sib->previousSibling()) {
@@ -679,6 +688,7 @@ QWebElement QWebElement::previousSibling() const
         Element* e = toElement(sib);
         return QWebElement(e);
     }
+    */
     return QWebElement();
 }
 
@@ -689,10 +699,8 @@ QWebElement QWebElement::document() const
 {
     if (!m_element)
         return QWebElement();
-    Document* document = m_element->document();
-    if (!document)
-        return QWebElement();
-    return QWebElement(document->documentElement());
+    Document& document = m_element->document();
+    return QWebElement(document.documentElement());
 }
 
 /*!
@@ -701,38 +709,38 @@ QWebElement QWebElement::document() const
 */
 QWebFrame *QWebElement::webFrame() const
 {
+    notImplemented();
+    return nullptr;
+    /*
     if (!m_element)
         return 0;
 
-    Document* document = m_element->document();
-    if (!document)
-        return 0;
+    Document& document = m_element->document();
 
-    Frame* frame = document->frame();
+    Frame* frame = document.frame();
     if (!frame)
         return 0;
     QWebFrameAdapter* frameAdapter = QWebFrameAdapter::kit(frame);
     return frameAdapter->apiHandle();
+    */
 }
 
-static bool setupScriptContext(WebCore::Element* element, ScriptState*& state, ScriptController*& scriptController)
+static bool setupScriptContext(WebCore::Element* element, ScriptState*& state)
 {
     if (!element)
         return false;
 
-    Document* document = element->document();
-    if (!document)
-        return false;
+    Document& document = element->document();
 
-    Frame* frame = document->frame();
+    Frame* frame = document.frame();
     if (!frame)
         return false;
 
-    scriptController = frame->script();
-    if (!scriptController)
+    ScriptController& scriptController = frame->script();
+    if (!scriptController.canExecuteScripts(AboutToExecuteScript))
         return false;
 
-    state = scriptController->globalObject(mainThreadNormalWorld())->globalExec();
+    state = scriptController.globalObject(mainThreadNormalWorld())->globalExec();
     if (!state)
         return false;
 
@@ -744,6 +752,8 @@ static bool setupScriptContext(WebCore::Element* element, ScriptState*& state, S
 */
 QVariant QWebElement::evaluateJavaScript(const QString& scriptSource)
 {
+    notImplemented();
+    /*
     if (scriptSource.isEmpty())
         return QVariant();
 
@@ -771,6 +781,8 @@ QVariant QWebElement::evaluateJavaScript(const QString& scriptSource)
     int distance = 0;
     JSValueRef* ignoredException = 0;
     return JSC::Bindings::convertValueToQVariant(toRef(state), evaluationResultRef, QMetaType::Void, &distance, ignoredException);
+    */
+    return QVariant();
 }
 
 /*!
@@ -818,14 +830,14 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         return QString();
 
     if (strategy == InlineStyle) {
-        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        const StyleProperties* style = static_cast<StyledElement*>(m_element)->inlineStyle();
         if (!style)
             return QString();
         return style->getPropertyValue(propID);
     }
 
     if (strategy == CascadedStyle) {
-        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        const StyleProperties* style = static_cast<StyledElement*>(m_element)->inlineStyle();
         if (style && style->propertyIsImportant(propID))
             return style->getPropertyValue(propID);
 
@@ -837,18 +849,19 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // by importance and inheritance order. This include external CSS
         // declarations, as well as embedded and inline style declarations.
 
-        Document* doc = m_element->document();
-        Vector<RefPtr<StyleRuleBase> > rules = doc->ensureStyleResolver()->styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
+        Document& doc = m_element->document();
+        Vector<RefPtr<StyleRule> > rules = doc.ensureStyleResolver().styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
         for (int i = rules.size(); i > 0; --i) {
             if (!rules[i - 1]->isStyleRule())
                 continue;
             StyleRule* styleRule = static_cast<StyleRule*>(rules[i - 1].get());
 
-            if (styleRule->properties()->propertyIsImportant(propID))
-                return styleRule->properties()->getPropertyValue(propID);
+            if (styleRule->properties().propertyIsImportant(propID))
+                return styleRule->properties().getPropertyValue(propID);
 
-            if (!style || style->getPropertyValue(propID).isEmpty())
+            /*if (!style || style->getPropertyValue(propID).isEmpty())
                 style = styleRule->properties();
+            */
         }
 
         if (!style)
@@ -977,11 +990,14 @@ void QWebElement::toggleClass(const QString &name)
 */
 void QWebElement::appendInside(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
     ExceptionCode exception = 0;
     m_element->appendChild(element.m_element, exception);
+    */
 }
 
 /*!
@@ -993,6 +1009,8 @@ void QWebElement::appendInside(const QWebElement &element)
 */
 void QWebElement::appendInside(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1003,6 +1021,7 @@ void QWebElement::appendInside(const QString &markup)
     RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, toHTMLElement(m_element), AllowScriptingContent, exception);
 
     m_element->appendChild(fragment, exception);
+    */
 }
 
 /*!
@@ -1018,6 +1037,8 @@ void QWebElement::appendInside(const QString &markup)
 */
 void QWebElement::prependInside(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
@@ -1027,6 +1048,7 @@ void QWebElement::prependInside(const QWebElement &element)
         m_element->insertBefore(element.m_element, m_element->firstChild(), exception);
     else
         m_element->appendChild(element.m_element, exception);
+    */
 }
 
 /*!
@@ -1038,6 +1060,8 @@ void QWebElement::prependInside(const QWebElement &element)
 */
 void QWebElement::prependInside(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1051,6 +1075,7 @@ void QWebElement::prependInside(const QString &markup)
         m_element->insertBefore(fragment, m_element->firstChild(), exception);
     else
         m_element->appendChild(fragment, exception);
+    */
 }
 
 
@@ -1066,6 +1091,8 @@ void QWebElement::prependInside(const QString &markup)
 */
 void QWebElement::prependOutside(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
@@ -1074,6 +1101,7 @@ void QWebElement::prependOutside(const QWebElement &element)
 
     ExceptionCode exception = 0;
     m_element->parentNode()->insertBefore(element.m_element, m_element, exception);
+    */
 }
 
 /*!
@@ -1085,6 +1113,8 @@ void QWebElement::prependOutside(const QWebElement &element)
 */
 void QWebElement::prependOutside(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1099,6 +1129,7 @@ void QWebElement::prependOutside(const QString &markup)
     RefPtr<DocumentFragment> fragment = createContextualFragment(markup, toHTMLElement(parent), AllowScriptingContent, exception);
 
     parent->insertBefore(fragment, m_element, exception);
+    */
 }
 
 /*!
@@ -1113,6 +1144,8 @@ void QWebElement::prependOutside(const QString &markup)
 */
 void QWebElement::appendOutside(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
@@ -1124,6 +1157,7 @@ void QWebElement::appendOutside(const QWebElement &element)
         m_element->parentNode()->appendChild(element.m_element, exception);
     else
         m_element->parentNode()->insertBefore(element.m_element, m_element->nextSibling(), exception);
+    */
 }
 
 /*!
@@ -1135,6 +1169,8 @@ void QWebElement::appendOutside(const QWebElement &element)
 */
 void QWebElement::appendOutside(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1152,6 +1188,7 @@ void QWebElement::appendOutside(const QString &markup)
         parent->appendChild(fragment, exception);
     else
         parent->insertBefore(fragment, m_element->nextSibling(), exception);
+    */
 }
 
 /*!
@@ -1163,10 +1200,14 @@ void QWebElement::appendOutside(const QString &markup)
 */
 QWebElement QWebElement::clone() const
 {
+    notImplemented();
+    /*
     if (!m_element)
         return QWebElement();
 
-    return QWebElement(m_element->cloneElementWithChildren().get());
+    return QWebElement(*m_element->cloneElementWithChildren(&document()).get());
+    */
+    return QWebElement();
 }
 
 /*!
@@ -1251,6 +1292,8 @@ static RefPtr<Node> findInsertionPoint(PassRefPtr<Node> root)
 */
 void QWebElement::encloseContentsWith(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
@@ -1272,6 +1315,7 @@ void QWebElement::encloseContentsWith(const QWebElement &element)
         m_element->insertBefore(element.m_element, m_element->firstChild(), exception);
     else
         m_element->appendChild(element.m_element, exception);
+    */
 }
 
 /*!
@@ -1282,6 +1326,8 @@ void QWebElement::encloseContentsWith(const QWebElement &element)
 */
 void QWebElement::encloseContentsWith(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1313,6 +1359,7 @@ void QWebElement::encloseContentsWith(const QString &markup)
         m_element->insertBefore(fragment, m_element->firstChild(), exception);
     else
         m_element->appendChild(fragment, exception);
+    */
 }
 
 /*!
@@ -1323,6 +1370,8 @@ void QWebElement::encloseContentsWith(const QString &markup)
 */
 void QWebElement::encloseWith(const QWebElement &element)
 {
+    notImplemented();
+    /*
     if (!m_element || element.isNull())
         return;
 
@@ -1345,6 +1394,7 @@ void QWebElement::encloseWith(const QWebElement &element)
         parent->appendChild(element.m_element, exception);
     else
         parent->insertBefore(element.m_element, siblingNode, exception);
+    */
 }
 
 /*!
@@ -1355,6 +1405,8 @@ void QWebElement::encloseWith(const QWebElement &element)
 */
 void QWebElement::encloseWith(const QString &markup)
 {
+    notImplemented();
+    /*
     if (!m_element)
         return;
 
@@ -1388,6 +1440,7 @@ void QWebElement::encloseWith(const QString &markup)
         parent->appendChild(fragment, exception);
     else
         parent->insertBefore(fragment, siblingNode, exception);
+    */
 }
 
 /*!
@@ -1468,11 +1521,9 @@ void QWebElement::render(QPainter* painter)
 void QWebElement::render(QPainter* painter, const QRect& clip)
 {
     WebCore::Element* e = m_element;
-    Document* doc = e ? e->document() : 0;
-    if (!doc)
-        return;
+    Document& doc = e->document();
 
-    Frame* frame = doc->frame();
+    Frame* frame = doc.frame();
     if (!frame || !frame->view() || !frame->contentRenderer())
         return;
 
@@ -1480,7 +1531,8 @@ void QWebElement::render(QPainter* painter, const QRect& clip)
 
     view->updateLayoutAndStyleIfNeededRecursive();
 
-    IntRect rect = e->pixelSnappedBoundingBox();
+    bool isReplaced;
+    IntRect rect = e->pixelSnappedRenderRect(&isReplaced);
 
     if (rect.size().isEmpty())
         return;
@@ -1495,7 +1547,7 @@ void QWebElement::render(QPainter* painter, const QRect& clip)
     context.translate(-rect.x(), -rect.y());
     painter->setClipRect(finalClipRect, Qt::IntersectClip);
     view->setNodeToDraw(e);
-    view->paintContents(&context, finalClipRect);
+    view->paintContents(context, finalClipRect);
     view->setNodeToDraw(0);
     context.restore();
 }
@@ -1513,6 +1565,10 @@ private:
 
 QWebElementCollectionPrivate* QWebElementCollectionPrivate::create(const PassRefPtr<Node> &context, const QString &query)
 {
+    notImplemented();
+    return 0;
+    /*
+    return 0;
     if (!context)
         return 0;
 
@@ -1525,6 +1581,7 @@ QWebElementCollectionPrivate* QWebElementCollectionPrivate::create(const PassRef
     QWebElementCollectionPrivate* priv = new QWebElementCollectionPrivate;
     priv->m_result = nodes;
     return priv;
+    */
 }
 
 /*!
@@ -1620,6 +1677,8 @@ QWebElementCollection QWebElementCollection::operator+(const QWebElementCollecti
 */
 void QWebElementCollection::append(const QWebElementCollection &other)
 {
+    notImplemented();
+    /*
     if (!d) {
         *this = other;
         return;
@@ -1640,6 +1699,7 @@ void QWebElementCollection::append(const QWebElementCollection &other)
     }
 
     d->m_result = StaticNodeList::adopt(nodes);
+    */
 }
 
 /*!
@@ -1657,10 +1717,14 @@ int QWebElementCollection::count() const
 */
 QWebElement QWebElementCollection::at(int i) const
 {
+    notImplemented();
+    /*
     if (!d)
         return QWebElement();
     Node* n = d->m_result->item(i);
     return QWebElement(toElement(n));
+    */
+    return QWebElement();
 }
 
 /*!
@@ -1688,6 +1752,9 @@ QWebElement QWebElementCollection::at(int i) const
 */
 QList<QWebElement> QWebElementCollection::toList() const
 {
+    notImplemented();
+    return QList<QWebElement>();
+    /*
     if (!d)
         return QList<QWebElement>();
     QList<QWebElement> elements;
@@ -1699,6 +1766,7 @@ QList<QWebElement> QWebElementCollection::toList() const
         n = d->m_result->item(++i);
     }
     return elements;
+    */
 }
 
 /*!
@@ -2078,23 +2146,27 @@ Element* QtWebElementRuntime::get(const QWebElement& element)
 
 static QVariant convertJSValueToWebElementVariant(JSC::JSObject* object, int *distance, HashSet<JSObjectRef>* visitedObjects)
 {
-    Element* element = 0;
+    notImplemented();
+    /*
+    Element element;
     QVariant ret;
-    if (object && object->inherits(&JSElement::s_info)) {
-        element =(static_cast<JSElement*>(object))->impl();
+    if (object && object->inherits(JSElement::info())) {
+        element =(static_cast<JSElement*>(object))->wrapped();
         *distance = 0;
         // Allow other objects to reach this one. This won't cause our algorithm to
         // loop since when we find an Element we do not recurse.
         visitedObjects->remove(toRef(object));
-    } else if (object && object->inherits(&JSDocument::s_info)) {
+    } else if (object && object->inherits(JSDocument::info())) {
         // To support TestRunnerQt::nodesFromRect(), used in DRT, we do an implicit
         // conversion from 'document' to the QWebElement representing the 'document.documentElement'.
         // We can't simply use a QVariantMap in nodesFromRect() because it currently times out
         // when serializing DOMMimeType and DOMPlugin, even if we limit the recursion.
-        element =(static_cast<JSDocument*>(object))->impl()->documentElement();
+        element =(static_cast<JSDocument*>(object))->wrapped().documentElement();
     }
 
-    return QVariant::fromValue<QWebElement>(QtWebElementRuntime::create(element));
+    return QVariant::fromValue<QWebElement>(QtWebElementRuntime::create(&element));
+    */
+    return QVariant();
 }
 
 static JSC::JSValue convertWebElementVariantToJSValue(JSC::ExecState* exec, WebCore::JSDOMGlobalObject* globalObject, const QVariant& variant)

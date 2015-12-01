@@ -22,13 +22,14 @@
 
 #include "ApplicationCacheStorage.h"
 #include "DatabaseManager.h"
-#include "KURL.h"
+#include "URL.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "qwebdatabase.h"
 #include "qwebdatabase_p.h"
 #include "qwebsecurityorigin_p.h"
+#include "NotImplemented.h"
 #include <QStringList>
 
 using namespace WebCore;
@@ -122,7 +123,7 @@ int QWebSecurityOrigin::port() const
 qint64 QWebSecurityOrigin::databaseUsage() const
 {
 #if ENABLE(SQL_DATABASE)
-    return DatabaseManager::manager().usageForOrigin(d->origin.get());
+    return DatabaseManager::singleton().usageForOrigin(d->origin.get());
 #else
     return 0;
 #endif
@@ -134,7 +135,7 @@ qint64 QWebSecurityOrigin::databaseUsage() const
 qint64 QWebSecurityOrigin::databaseQuota() const
 {
 #if ENABLE(SQL_DATABASE)
-    return DatabaseManager::manager().quotaForOrigin(d->origin.get());
+    return DatabaseManager::singleton().quotaForOrigin(d->origin.get());
 #else
     return 0;
 #endif
@@ -150,13 +151,14 @@ qint64 QWebSecurityOrigin::databaseQuota() const
 void QWebSecurityOrigin::setDatabaseQuota(qint64 quota)
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseManager::manager().setQuota(d->origin.get(), quota);
+    DatabaseManager::singleton().setQuota(d->origin.get(), quota);
 #endif
 }
 
 void QWebSecurityOrigin::setApplicationCacheQuota(qint64 quota)
 {
-    WebCore::cacheStorage().storeUpdatedQuotaForOrigin(d->origin.get(), quota);
+    notImplemented();
+    //WebCore::cacheStorage().storeUpdatedQuotaForOrigin(d->origin.get(), quota);
 }
 /*!
     Destroys the security origin.
@@ -182,7 +184,7 @@ QList<QWebSecurityOrigin> QWebSecurityOrigin::allOrigins()
 
 #if ENABLE(SQL_DATABASE)
     Vector<RefPtr<SecurityOrigin> > coreOrigins;
-    DatabaseManager::manager().origins(coreOrigins);
+    DatabaseManager::singleton().origins(coreOrigins);
 
     for (unsigned i = 0; i < coreOrigins.size(); ++i) {
         QWebSecurityOriginPrivate* priv = new QWebSecurityOriginPrivate(coreOrigins[i].get());
@@ -203,7 +205,7 @@ QList<QWebDatabase> QWebSecurityOrigin::databases() const
 #if ENABLE(SQL_DATABASE)
     Vector<String> nameVector;
 
-    if (!DatabaseManager::manager().databaseNamesForOrigin(d->origin.get(), nameVector))
+    if (!DatabaseManager::singleton().databaseNamesForOrigin(d->origin.get(), nameVector))
         return databases;
     for (unsigned i = 0; i < nameVector.size(); ++i) {
         QWebDatabasePrivate* priv = new QWebDatabasePrivate();
@@ -273,7 +275,7 @@ QStringList QWebSecurityOrigin::localSchemes()
 */
 QWebSecurityOrigin::QWebSecurityOrigin(const QUrl& url)
 {
-    d = new QWebSecurityOriginPrivate(SecurityOrigin::create(KURL(url)));
+    d = new QWebSecurityOriginPrivate(SecurityOrigin::create(URL(url)));
 }
 
 /*!

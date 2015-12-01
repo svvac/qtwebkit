@@ -58,8 +58,6 @@
 #include "NotificationPresenterClientQt.h"
 #include "Page.h"
 #include "PageGroup.h"
-#include "PluginDatabase.h"
-#include "PluginView.h"
 #include "PositionError.h"
 #include "PrintContext.h"
 #include "QWebFrameAdapter.h"
@@ -339,7 +337,7 @@ bool DumpRenderTreeSupportQt::isCommandEnabled(QWebPageAdapter *adapter, const Q
 
 QVariantList DumpRenderTreeSupportQt::selectedRange(QWebPageAdapter *adapter)
 {
-    WebCore::Frame* frame = adapter->page->focusController()->focusedOrMainFrame();
+    WebCore::Frame* frame = adapter->page->focusController().focusedOrMainFrame();
     QVariantList selectedRange;
     RefPtr<Range> range = frame->selection()->toNormalizedRange().get();
 

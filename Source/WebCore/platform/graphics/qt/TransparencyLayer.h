@@ -45,7 +45,7 @@ namespace WebCore {
 struct TransparencyLayer {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    TransparencyLayer(const QPainter* p, const QRect &rect, qreal opacity, QPixmap& alphaMask)
+    TransparencyLayer(const QPainter* p, const QRectF &rect, qreal opacity, QPixmap& alphaMask)
         : opacity(opacity)
         , alphaMask(alphaMask)
         , saveCounter(1) // see the comment for saveCounter
@@ -70,7 +70,7 @@ public:
     }
 
     QPixmap pixmap;
-    QPoint offset;
+    QPointF offset;
     QPainter painter;
     qreal opacity;
     // for clipToImageBuffer

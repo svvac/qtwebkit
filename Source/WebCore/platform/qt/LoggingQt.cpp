@@ -18,7 +18,7 @@
 */
 
 #include "config.h"
-#include "InitializeLogging.h"
+#include "NotImplemented.h"
 #include "Logging.h"
 
 #if !LOG_DISABLED
@@ -45,10 +45,7 @@ void initializeLoggingChannelsIfNecessary()
     qWarning("This is a release build. Setting QT_WEBKIT_LOG will have no effect.");
 #else
     QStringList channels = QString::fromLocal8Bit(loggingEnv).split(QLatin1String(","));
-    for (int i = 0; i < channels.count(); i++) {
-        if (WTFLogChannel* channel = getChannelFromName(channels.at(i)))
-            channel->state = WTFLogChannelOn;
-    }
+    notImplemented();
 
     // By default we log calls to notImplemented(). This can be turned
     // off by setting the environment variable DISABLE_NI_WARNING to 1

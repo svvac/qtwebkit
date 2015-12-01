@@ -20,15 +20,12 @@
 #include "config.h"
 #include "qwebsettings.h"
 
-#include "qwebplugindatabase_p.h"
-
 #include "ApplicationCacheStorage.h"
 #include "CrossOriginPreflightResultCache.h"
 #include "DatabaseManager.h"
 #include "FileSystem.h"
 #include "FontCache.h"
 #include "GCController.h"
-#include "GroupSettings.h"
 #include "IconDatabase.h"
 #include "Image.h"
 #if ENABLE(ICONDATABASE)
@@ -36,15 +33,14 @@
 #endif
 #include "InitWebCoreQt.h"
 #include "IntSize.h"
-#include "KURL.h"
+#include "URL.h"
 #include "MemoryCache.h"
 #include "NetworkStateNotifier.h"
+#include "NotImplemented.h"
 #include "Page.h"
 #include "PageCache.h"
-#include "PluginDatabase.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
-#include "StorageThread.h"
 #include "WorkerThread.h"
 #include <QDir>
 #include <QFileInfo>
@@ -181,14 +177,14 @@ void QWebSettingsPrivate::apply()
         settings->setWebAudioEnabled(value);
 #endif
 
-        value = attributes.value(QWebSettings::CSSRegionsEnabled,
+        /*value = attributes.value<bool>(QWebSettings::CSSRegionsEnabled,
                                  global->attributes.value(QWebSettings::CSSRegionsEnabled));
         WebCore::RuntimeEnabledFeatures::setCSSRegionsEnabled(value);
 
         value = attributes.value(QWebSettings::CSSGridLayoutEnabled,
                                  global->attributes.value(QWebSettings::CSSGridLayoutEnabled));
         settings->setCSSGridLayoutEnabled(value);
-
+*/
         value = attributes.value(QWebSettings::HyperlinkAuditingEnabled,
                                  global->attributes.value(QWebSettings::HyperlinkAuditingEnabled));
 
@@ -232,7 +228,7 @@ void QWebSettingsPrivate::apply()
         settings->setFrameFlatteningEnabled(value);
 
         QUrl location = !userStyleSheetLocation.isEmpty() ? userStyleSheetLocation : global->userStyleSheetLocation;
-        settings->setUserStyleSheetLocation(WebCore::KURL(location));
+        settings->setUserStyleSheetLocation(WebCore::URL(location));
 
         QString encoding = !defaultTextEncoding.isEmpty() ? defaultTextEncoding: global->defaultTextEncoding;
         settings->setDefaultTextEncodingName(encoding);
@@ -250,7 +246,7 @@ void QWebSettingsPrivate::apply()
         value = attributes.value(QWebSettings::OfflineStorageDatabaseEnabled,
                                       global->attributes.value(QWebSettings::OfflineStorageDatabaseEnabled));
 #if ENABLE(SQL_DATABASE)
-        WebCore::DatabaseManager::manager().setIsAvailable(value);
+        WebCore::DatabaseManager::singleton().setIsAvailable(value);
 #endif
 
 #if ENABLE(INDEXED_DATABASE)
@@ -275,7 +271,7 @@ void QWebSettingsPrivate::apply()
         bool remoteAccess = attributes.value(QWebSettings::LocalContentCanAccessRemoteUrls,
                                       global->attributes.value(QWebSettings::LocalContentCanAccessRemoteUrls));
         settings->setAllowUniversalAccessFromFileURLs(remoteAccess);
-        settings->setAllowRemoteAccessFromFileURLs(remoteAccess);
+        //settings->setAllowRemoteAccessFromFileURLs(remoteAccess);
 
         value = attributes.value(QWebSettings::LocalContentCanAccessFileUrls,
                                       global->attributes.value(QWebSettings::LocalContentCanAccessFileUrls));
@@ -309,7 +305,7 @@ void QWebSettingsPrivate::apply()
                                       global->attributes.value(QWebSettings::SiteSpecificQuirksEnabled));
         settings->setNeedsSiteSpecificQuirks(value);
 
-        settings->setUsesPageCache(WebCore::pageCache()->capacity());
+        settings->setUsesPageCache(WebCore::PageCache::singleton().maxSize());
 
         value = attributes.value(QWebSettings::WebSecurityEnabled,
                                               global->attributes.value(QWebSettings::WebSecurityEnabled));
@@ -782,7 +778,7 @@ void QWebSettings::clearIconDatabase()
 QIcon QWebSettings::iconForUrl(const QUrl& url)
 {
     WebCore::initializeWebCoreQt();
-    QPixmap* icon = WebCore::iconDatabase().synchronousNativeIconForPageURL(WebCore::KURL(url).string(),
+    QPixmap* icon = WebCore::iconDatabase().synchronousNativeIconForPageURL(WebCore::URL(url).string(),
                                 WebCore::IntSize(16, 16));
     if (!icon)
         return QIcon();
@@ -863,33 +859,28 @@ void QWebSettings::clearMemoryCaches()
     // Turn the cache on and off.  Disabling the object cache will remove all
     // resources from the cache.  They may still live on if they are referenced
     // by some Web page though.
-    if (!WebCore::memoryCache()->disabled()) {
-        WebCore::memoryCache()->setDisabled(true);
-        WebCore::memoryCache()->setDisabled(false);
+    if (!WebCore::MemoryCache::singleton().disabled()) {
+        WebCore::MemoryCache::singleton().setDisabled(true);
+        WebCore::MemoryCache::singleton().setDisabled(false);
     }
 
-    int pageCapacity = WebCore::pageCache()->capacity();
+    int pageCapacity = WebCore::PageCache::singleton().maxSize();
     // Setting size to 0, makes all pages be released.
-    WebCore::pageCache()->setCapacity(0);
-    WebCore::pageCache()->setCapacity(pageCapacity);
+    WebCore::PageCache::singleton().setMaxSize(0);
+    WebCore::PageCache::singleton().setMaxSize(pageCapacity);
 
     // Invalidating the font cache and freeing all inactive font data.
-    WebCore::fontCache()->invalidate();
+    WebCore::FontCache::singleton().invalidate();
 
     // Empty the Cross-Origin Preflight cache
-    WebCore::CrossOriginPreflightResultCache::shared().empty();
+    WebCore::CrossOriginPreflightResultCache::singleton().empty();
 
     // Drop JIT compiled code from ExecutableAllocator.
-    WebCore::gcController().discardAllCompiledCode();
+    WebCore::GCController::singleton().deleteAllCode();
     // Garbage Collect to release the references of CachedResource from dead objects.
-    WebCore::gcController().garbageCollectNow();
+    WebCore::GCController::singleton().garbageCollectNow();
 
-    // FastMalloc has lock-free thread specific caches that can only be cleared from the thread itself.
-    WebCore::StorageThread::releaseFastMallocFreeMemoryInAllThreads();
-#if ENABLE(WORKERS)
-    WebCore::WorkerThread::releaseFastMallocFreeMemoryInAllThreads();
-#endif
-    WTF::releaseFastMallocFreeMemory();        
+    WTF::releaseFastMallocFreeMemory();
 }
 
 /*!
@@ -905,7 +896,7 @@ void QWebSettings::clearMemoryCaches()
 void QWebSettings::setMaximumPagesInCache(int pages)
 {
     QWebSettingsPrivate* global = QWebSettings::globalSettings()->d;
-    WebCore::pageCache()->setCapacity(qMax(0, pages));
+    WebCore::PageCache::singleton().setMaxSize(qMax(0, pages));
     global->apply();
 }
 
@@ -915,7 +906,7 @@ void QWebSettings::setMaximumPagesInCache(int pages)
 int QWebSettings::maximumPagesInCache()
 {
     WebCore::initializeWebCoreQt();
-    return WebCore::pageCache()->capacity();
+    return WebCore::PageCache::singleton().maxSize();
 }
 
 /*!
@@ -938,12 +929,12 @@ void QWebSettings::setObjectCacheCapacities(int cacheMinDeadCapacity, int cacheM
 {
     WebCore::initializeWebCoreQt();
     bool disableCache = !cacheMinDeadCapacity && !cacheMaxDead && !totalCapacity;
-    WebCore::memoryCache()->setDisabled(disableCache);
+    WebCore::MemoryCache::singleton().setDisabled(disableCache);
 
-    WebCore::memoryCache()->setCapacities(qMax(0, cacheMinDeadCapacity),
+    WebCore::MemoryCache::singleton().setCapacities(qMax(0, cacheMinDeadCapacity),
                                     qMax(0, cacheMaxDead),
                                     qMax(0, totalCapacity));
-    WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(disableCache ? 0 : 60);
+    //WebCore::MemoryCache::singleton().setDeadDecodedDataDeletionInterval(disableCache ?  0 : 60);
 }
 
 /*!
@@ -1087,7 +1078,7 @@ void QWebSettings::setOfflineStoragePath(const QString& path)
     WebCore::initializeWebCoreQt();
     QWebSettings::globalSettings()->d->offlineDatabasePath = path;
 #if ENABLE(SQL_DATABASE)
-    WebCore::DatabaseManager::manager().setDatabaseDirectoryPath(path);
+    WebCore::DatabaseManager::singleton().setDatabaseDirectoryPath(path);
 #endif
 }
 
@@ -1151,7 +1142,7 @@ qint64 QWebSettings::offlineStorageDefaultQuota()
 void QWebSettings::setOfflineWebApplicationCachePath(const QString& path)
 {
     WebCore::initializeWebCoreQt();
-    WebCore::cacheStorage().setCacheDirectory(path);
+    //WebCore::CachedeStorage().setCacheDirectory(path);
 }
 
 /*!
@@ -1165,7 +1156,9 @@ void QWebSettings::setOfflineWebApplicationCachePath(const QString& path)
 QString QWebSettings::offlineWebApplicationCachePath()
 {
     WebCore::initializeWebCoreQt();
-    return WebCore::cacheStorage().cacheDirectory();
+    notImplemented();
+    //return WebCore::cacheStorage().cacheDirectory();
+    return QString();
 }
 
 /*!
@@ -1177,9 +1170,9 @@ QString QWebSettings::offlineWebApplicationCachePath()
 void QWebSettings::setOfflineWebApplicationCacheQuota(qint64 maximumSize)
 {
     WebCore::initializeWebCoreQt();
-    WebCore::cacheStorage().empty();
-    WebCore::cacheStorage().vacuumDatabaseFile();
-    WebCore::cacheStorage().setMaximumSize(maximumSize);
+    //WebCore::cacheStorage().empty();
+    //WebCore::cacheStorage().vacuumDatabaseFile();
+    //WebCore::cacheStorage().setMaximumSize(maximumSize);
 }
 
 /*!
@@ -1190,7 +1183,9 @@ void QWebSettings::setOfflineWebApplicationCacheQuota(qint64 maximumSize)
 qint64 QWebSettings::offlineWebApplicationCacheQuota()
 {
     WebCore::initializeWebCoreQt();
-    return WebCore::cacheStorage().maximumSize();
+    notImplemented();
+    //return WebCore::cacheStorage().maximumSize();
+    return 0;
 }
 
 /*!

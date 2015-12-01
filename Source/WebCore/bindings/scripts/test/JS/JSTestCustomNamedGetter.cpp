@@ -23,7 +23,7 @@
 
 #include "ExceptionCode.h"
 #include "JSDOMBinding.h"
-#include "TestCustomNamedGetter.h"
+#include "JSDOMConstructor.h"
 #include "wtf/text/AtomicString.h"
 #include <runtime/Error.h>
 #include <wtf/GetPtr.h>
@@ -32,93 +32,94 @@ using namespace JSC;
 
 namespace WebCore {
 
+// Functions
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestCustomNamedGetterPrototypeFunctionAnotherFunction(JSC::ExecState*);
+
+// Attributes
+
+JSC::EncodedJSValue jsTestCustomNamedGetterConstructor(JSC::ExecState*, JSC::JSObject*, JSC::EncodedJSValue, JSC::PropertyName);
+
+class JSTestCustomNamedGetterPrototype : public JSC::JSNonFinalObject {
+public:
+    typedef JSC::JSNonFinalObject Base;
+    static JSTestCustomNamedGetterPrototype* create(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::Structure* structure)
+    {
+        JSTestCustomNamedGetterPrototype* ptr = new (NotNull, JSC::allocateCell<JSTestCustomNamedGetterPrototype>(vm.heap)) JSTestCustomNamedGetterPrototype(vm, globalObject, structure);
+        ptr->finishCreation(vm);
+        return ptr;
+    }
+
+    DECLARE_INFO;
+    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
+    {
+        return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
+    }
+
+private:
+    JSTestCustomNamedGetterPrototype(JSC::VM& vm, JSC::JSGlobalObject*, JSC::Structure* structure)
+        : JSC::JSNonFinalObject(vm, structure)
+    {
+    }
+
+    void finishCreation(JSC::VM&);
+};
+
+typedef JSDOMConstructorNotConstructable<JSTestCustomNamedGetter> JSTestCustomNamedGetterConstructor;
+
 /* Hash table */
+
+static const struct CompactHashIndex JSTestCustomNamedGetterTableIndex[2] = {
+    { -1, -1 },
+    { 0, -1 },
+};
+
 
 static const HashTableValue JSTestCustomNamedGetterTableValues[] =
 {
-    { "constructor", DontEnum | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestCustomNamedGetterConstructor), (intptr_t)0, NoIntrinsic },
-    { 0, 0, 0, 0, NoIntrinsic }
+    { "constructor", DontEnum | ReadOnly, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestCustomNamedGetterConstructor), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(0) } },
 };
 
-static const HashTable JSTestCustomNamedGetterTable = { 2, 1, JSTestCustomNamedGetterTableValues, 0 };
-/* Hash table for constructor */
-
-static const HashTableValue JSTestCustomNamedGetterConstructorTableValues[] =
+static const HashTable JSTestCustomNamedGetterTable = { 1, 1, true, JSTestCustomNamedGetterTableValues, JSTestCustomNamedGetterTableIndex };
+template<> void JSTestCustomNamedGetterConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-    { 0, 0, 0, 0, NoIntrinsic }
-};
-
-static const HashTable JSTestCustomNamedGetterConstructorTable = { 1, 0, JSTestCustomNamedGetterConstructorTableValues, 0 };
-const ClassInfo JSTestCustomNamedGetterConstructor::s_info = { "TestCustomNamedGetterConstructor", &Base::s_info, &JSTestCustomNamedGetterConstructorTable, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterConstructor) };
-
-JSTestCustomNamedGetterConstructor::JSTestCustomNamedGetterConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
-    : DOMConstructorObject(structure, globalObject)
-{
+    putDirect(vm, vm.propertyNames->prototype, JSTestCustomNamedGetter::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestCustomNamedGetter"))), ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
 
-void JSTestCustomNamedGetterConstructor::finishCreation(ExecState* exec, JSDOMGlobalObject* globalObject)
-{
-    Base::finishCreation(exec->vm());
-    ASSERT(inherits(&s_info));
-    putDirect(exec->vm(), exec->propertyNames().prototype, JSTestCustomNamedGetterPrototype::self(exec, globalObject), DontDelete | ReadOnly);
-    putDirect(exec->vm(), exec->propertyNames().length, jsNumber(0), ReadOnly | DontDelete | DontEnum);
-}
-
-bool JSTestCustomNamedGetterConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    return getStaticValueSlot<JSTestCustomNamedGetterConstructor, JSDOMWrapper>(exec, &JSTestCustomNamedGetterConstructorTable, jsCast<JSTestCustomNamedGetterConstructor*>(cell), propertyName, slot);
-}
-
-bool JSTestCustomNamedGetterConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    return getStaticValueDescriptor<JSTestCustomNamedGetterConstructor, JSDOMWrapper>(exec, &JSTestCustomNamedGetterConstructorTable, jsCast<JSTestCustomNamedGetterConstructor*>(object), propertyName, descriptor);
-}
+template<> const ClassInfo JSTestCustomNamedGetterConstructor::s_info = { "TestCustomNamedGetterConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterConstructor) };
 
 /* Hash table for prototype */
 
 static const HashTableValue JSTestCustomNamedGetterPrototypeTableValues[] =
 {
-    { "anotherFunction", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestCustomNamedGetterPrototypeFunctionAnotherFunction), (intptr_t)1, NoIntrinsic },
-    { 0, 0, 0, 0, NoIntrinsic }
+    { "anotherFunction", JSC::Function, NoIntrinsic, { (intptr_t)static_cast<NativeFunction>(jsTestCustomNamedGetterPrototypeFunctionAnotherFunction), (intptr_t) (1) } },
 };
 
-static const HashTable JSTestCustomNamedGetterPrototypeTable = { 2, 1, JSTestCustomNamedGetterPrototypeTableValues, 0 };
-const ClassInfo JSTestCustomNamedGetterPrototype::s_info = { "TestCustomNamedGetterPrototype", &Base::s_info, &JSTestCustomNamedGetterPrototypeTable, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterPrototype) };
+const ClassInfo JSTestCustomNamedGetterPrototype::s_info = { "TestCustomNamedGetterPrototype", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterPrototype) };
 
-JSObject* JSTestCustomNamedGetterPrototype::self(ExecState* exec, JSGlobalObject* globalObject)
-{
-    return getDOMPrototype<JSTestCustomNamedGetter>(exec, globalObject);
-}
-
-bool JSTestCustomNamedGetterPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    JSTestCustomNamedGetterPrototype* thisObject = jsCast<JSTestCustomNamedGetterPrototype*>(cell);
-    return getStaticFunctionSlot<JSObject>(exec, &JSTestCustomNamedGetterPrototypeTable, thisObject, propertyName, slot);
-}
-
-bool JSTestCustomNamedGetterPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSTestCustomNamedGetterPrototype* thisObject = jsCast<JSTestCustomNamedGetterPrototype*>(object);
-    return getStaticFunctionDescriptor<JSObject>(exec, &JSTestCustomNamedGetterPrototypeTable, thisObject, propertyName, descriptor);
-}
-
-const ClassInfo JSTestCustomNamedGetter::s_info = { "TestCustomNamedGetter", &Base::s_info, &JSTestCustomNamedGetterTable, 0 , CREATE_METHOD_TABLE(JSTestCustomNamedGetter) };
-
-JSTestCustomNamedGetter::JSTestCustomNamedGetter(Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestCustomNamedGetter> impl)
-    : JSDOMWrapper(structure, globalObject)
-    , m_impl(impl.leakRef())
-{
-}
-
-void JSTestCustomNamedGetter::finishCreation(VM& vm)
+void JSTestCustomNamedGetterPrototype::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    reifyStaticProperties(vm, JSTestCustomNamedGetterPrototypeTableValues, *this);
 }
 
-JSObject* JSTestCustomNamedGetter::createPrototype(ExecState* exec, JSGlobalObject* globalObject)
+const ClassInfo JSTestCustomNamedGetter::s_info = { "TestCustomNamedGetter", &Base::s_info, &JSTestCustomNamedGetterTable, CREATE_METHOD_TABLE(JSTestCustomNamedGetter) };
+
+JSTestCustomNamedGetter::JSTestCustomNamedGetter(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestCustomNamedGetter>&& impl)
+    : JSDOMWrapper<TestCustomNamedGetter>(structure, globalObject, WTF::move(impl))
 {
-    return JSTestCustomNamedGetterPrototype::create(exec->vm(), globalObject, JSTestCustomNamedGetterPrototype::createStructure(globalObject->vm(), globalObject, globalObject->objectPrototype()));
+}
+
+JSObject* JSTestCustomNamedGetter::createPrototype(VM& vm, JSGlobalObject* globalObject)
+{
+    return JSTestCustomNamedGetterPrototype::create(vm, globalObject, JSTestCustomNamedGetterPrototype::createStructure(vm, globalObject, globalObject->objectPrototype()));
+}
+
+JSObject* JSTestCustomNamedGetter::getPrototype(VM& vm, JSGlobalObject* globalObject)
+{
+    return getDOMPrototype<JSTestCustomNamedGetter>(vm, globalObject);
 }
 
 void JSTestCustomNamedGetter::destroy(JSC::JSCell* cell)
@@ -127,97 +128,83 @@ void JSTestCustomNamedGetter::destroy(JSC::JSCell* cell)
     thisObject->JSTestCustomNamedGetter::~JSTestCustomNamedGetter();
 }
 
-JSTestCustomNamedGetter::~JSTestCustomNamedGetter()
+bool JSTestCustomNamedGetter::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
 {
-    releaseImplIfNotNull();
-}
-
-bool JSTestCustomNamedGetter::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    JSTestCustomNamedGetter* thisObject = jsCast<JSTestCustomNamedGetter*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    if (canGetItemsForName(exec, static_cast<TestCustomNamedGetter*>(thisObject->impl()), propertyName)) {
-        slot.setCustom(thisObject, thisObject->nameGetter);
+    auto* thisObject = jsCast<JSTestCustomNamedGetter*>(object);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+    if (getStaticValueSlot<JSTestCustomNamedGetter, Base>(state, JSTestCustomNamedGetterTable, thisObject, propertyName, slot))
         return true;
+    JSValue proto = thisObject->prototype();
+    if (proto.isObject() && jsCast<JSObject*>(proto)->hasProperty(state, propertyName))
+        return false;
+
+    if (thisObject->classInfo() == info()) {
+        JSValue value;
+        if (thisObject->nameGetter(state, propertyName, value)) {
+            slot.setValue(thisObject, ReadOnly | DontDelete | DontEnum, value);
+            return true;
+        }
     }
-    return getStaticValueSlot<JSTestCustomNamedGetter, Base>(exec, &JSTestCustomNamedGetterTable, thisObject, propertyName, slot);
-}
-
-bool JSTestCustomNamedGetter::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSTestCustomNamedGetter* thisObject = jsCast<JSTestCustomNamedGetter*>(object);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    if (canGetItemsForName(exec, static_cast<TestCustomNamedGetter*>(thisObject->impl()), propertyName)) {
-        PropertySlot slot;
-        slot.setCustom(thisObject, nameGetter);
-        descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
-        return true;
-    }
-    return getStaticValueDescriptor<JSTestCustomNamedGetter, Base>(exec, &JSTestCustomNamedGetterTable, thisObject, propertyName, descriptor);
-}
-
-bool JSTestCustomNamedGetter::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned index, PropertySlot& slot)
-{
-    JSTestCustomNamedGetter* thisObject = jsCast<JSTestCustomNamedGetter*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    PropertyName propertyName = Identifier::from(exec, index);
-    if (canGetItemsForName(exec, static_cast<TestCustomNamedGetter*>(thisObject->impl()), propertyName)) {
-        slot.setCustom(thisObject, thisObject->nameGetter);
-        return true;
-    }
-    return Base::getOwnPropertySlotByIndex(thisObject, exec, index, slot);
-}
-
-JSValue jsTestCustomNamedGetterConstructor(ExecState* exec, JSValue slotBase, PropertyName)
-{
-    JSTestCustomNamedGetter* domObject = jsCast<JSTestCustomNamedGetter*>(asObject(slotBase));
-    return JSTestCustomNamedGetter::getConstructor(exec, domObject->globalObject());
-}
-
-JSValue JSTestCustomNamedGetter::getConstructor(ExecState* exec, JSGlobalObject* globalObject)
-{
-    return getDOMConstructor<JSTestCustomNamedGetterConstructor>(exec, jsCast<JSDOMGlobalObject*>(globalObject));
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestCustomNamedGetterPrototypeFunctionAnotherFunction(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestCustomNamedGetter::s_info))
-        return throwVMTypeError(exec);
-    JSTestCustomNamedGetter* castedThis = jsCast<JSTestCustomNamedGetter*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestCustomNamedGetter::s_info);
-    TestCustomNamedGetter* impl = static_cast<TestCustomNamedGetter*>(castedThis->impl());
-    if (exec->argumentCount() < 1)
-        return throwVMError(exec, createNotEnoughArgumentsError(exec));
-    const String& str(exec->argument(0).isEmpty() ? String() : exec->argument(0).toString(exec)->value(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-    impl->anotherFunction(str);
-    return JSValue::encode(jsUndefined());
-}
-
-static inline bool isObservable(JSTestCustomNamedGetter* jsTestCustomNamedGetter)
-{
-    if (jsTestCustomNamedGetter->hasCustomProperties())
-        return true;
     return false;
+}
+
+bool JSTestCustomNamedGetter::getOwnPropertySlotByIndex(JSObject* object, ExecState* state, unsigned index, PropertySlot& slot)
+{
+    auto* thisObject = jsCast<JSTestCustomNamedGetter*>(object);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+    Identifier propertyName = Identifier::from(state, index);
+    if (thisObject->classInfo() == info()) {
+        JSValue value;
+        if (thisObject->nameGetter(state, propertyName, value)) {
+            slot.setValue(thisObject, ReadOnly | DontDelete | DontEnum, value);
+            return true;
+        }
+    }
+    return Base::getOwnPropertySlotByIndex(thisObject, state, index, slot);
+}
+
+EncodedJSValue jsTestCustomNamedGetterConstructor(ExecState* state, JSObject*, EncodedJSValue thisValue, PropertyName)
+{
+    JSTestCustomNamedGetter* domObject = jsDynamicCast<JSTestCustomNamedGetter*>(JSValue::decode(thisValue));
+    if (!domObject)
+        return throwVMTypeError(state);
+    return JSValue::encode(JSTestCustomNamedGetter::getConstructor(state->vm(), domObject->globalObject()));
+}
+
+JSValue JSTestCustomNamedGetter::getConstructor(VM& vm, JSGlobalObject* globalObject)
+{
+    return getDOMConstructor<JSTestCustomNamedGetterConstructor>(vm, *jsCast<JSDOMGlobalObject*>(globalObject));
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestCustomNamedGetterPrototypeFunctionAnotherFunction(ExecState* state)
+{
+    JSValue thisValue = state->thisValue();
+    JSTestCustomNamedGetter* castedThis = jsDynamicCast<JSTestCustomNamedGetter*>(thisValue);
+    if (UNLIKELY(!castedThis))
+        return throwThisTypeError(*state, "TestCustomNamedGetter", "anotherFunction");
+    ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestCustomNamedGetter::info());
+    auto& impl = castedThis->wrapped();
+    if (UNLIKELY(state->argumentCount() < 1))
+        return throwVMError(state, createNotEnoughArgumentsError(state));
+    String str = state->argument(0).toString(state)->value(state);
+    if (UNLIKELY(state->hadException()))
+        return JSValue::encode(jsUndefined());
+    impl.anotherFunction(str);
+    return JSValue::encode(jsUndefined());
 }
 
 bool JSTestCustomNamedGetterOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
 {
-    JSTestCustomNamedGetter* jsTestCustomNamedGetter = jsCast<JSTestCustomNamedGetter*>(handle.get().asCell());
-    if (!isObservable(jsTestCustomNamedGetter))
-        return false;
+    UNUSED_PARAM(handle);
     UNUSED_PARAM(visitor);
     return false;
 }
 
 void JSTestCustomNamedGetterOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    JSTestCustomNamedGetter* jsTestCustomNamedGetter = jsCast<JSTestCustomNamedGetter*>(handle.get().asCell());
-    DOMWrapperWorld* world = static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, jsTestCustomNamedGetter->impl(), jsTestCustomNamedGetter);
-    jsTestCustomNamedGetter->releaseImpl();
+    auto* jsTestCustomNamedGetter = jsCast<JSTestCustomNamedGetter*>(handle.slot()->asCell());
+    auto& world = *static_cast<DOMWrapperWorld*>(context);
+    uncacheWrapper(world, &jsTestCustomNamedGetter->wrapped(), jsTestCustomNamedGetter);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -228,11 +215,19 @@ extern "C" { extern void (*const __identifier("??_7TestCustomNamedGetter@WebCore
 extern "C" { extern void* _ZTVN7WebCore21TestCustomNamedGetterE[]; }
 #endif
 #endif
-JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestCustomNamedGetter* impl)
+
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestCustomNamedGetter* impl)
 {
     if (!impl)
         return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestCustomNamedGetter>(exec, impl))
+    return createNewWrapper<JSTestCustomNamedGetter>(globalObject, impl);
+}
+
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestCustomNamedGetter* impl)
+{
+    if (!impl)
+        return jsNull();
+    if (JSValue result = getExistingWrapper<JSTestCustomNamedGetter>(globalObject, impl))
         return result;
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -253,13 +248,14 @@ JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestCus
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    ReportMemoryCost<TestCustomNamedGetter>::reportMemoryCost(exec, impl);
-    return createNewWrapper<JSTestCustomNamedGetter>(exec, globalObject, impl);
+    return createNewWrapper<JSTestCustomNamedGetter>(globalObject, impl);
 }
 
-TestCustomNamedGetter* toTestCustomNamedGetter(JSC::JSValue value)
+TestCustomNamedGetter* JSTestCustomNamedGetter::toWrapped(JSC::JSValue value)
 {
-    return value.inherits(&JSTestCustomNamedGetter::s_info) ? jsCast<JSTestCustomNamedGetter*>(asObject(value))->impl() : 0;
+    if (auto* wrapper = jsDynamicCast<JSTestCustomNamedGetter*>(value))
+        return &wrapper->wrapped();
+    return nullptr;
 }
 
 }

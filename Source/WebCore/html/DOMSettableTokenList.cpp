@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,66 +28,10 @@
 
 namespace WebCore {
 
-DOMSettableTokenList::DOMSettableTokenList()
-    : m_value()
-    , m_tokens()
+void DOMSettableTokenList::setValue(const String& value)
 {
-}
-
-DOMSettableTokenList::~DOMSettableTokenList()
-{
-}
-
-const AtomicString DOMSettableTokenList::item(unsigned index) const
-{
-    if (index >= length())
-        return AtomicString();
-    return m_tokens[index];
-}
-
-bool DOMSettableTokenList::containsInternal(const AtomicString& token) const
-{
-    return m_tokens.contains(token);
-}
-
-void DOMSettableTokenList::add(const Vector<String>& tokens, ExceptionCode& ec)
-{
-    DOMTokenList::add(tokens, ec);
-
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        if (m_tokens.isNull())
-            m_tokens.set(tokens[i], false);
-        else
-            m_tokens.add(tokens[i]);
-    }
-}
-
-void DOMSettableTokenList::addInternal(const AtomicString& token)
-{
-    DOMTokenList::addInternal(token);
-    if (m_tokens.isNull())
-        m_tokens.set(token, false);
-    else
-        m_tokens.add(token);
-}
-
-void DOMSettableTokenList::remove(const Vector<String>& tokens, ExceptionCode& ec)
-{
-    DOMTokenList::remove(tokens, ec);
-    for (size_t i = 0; i < tokens.size(); ++i)
-        m_tokens.remove(tokens[i]);
-}
-
-void DOMSettableTokenList::removeInternal(const AtomicString& token)
-{
-    DOMTokenList::removeInternal(token);
-    m_tokens.remove(token);
-}
-
-void DOMSettableTokenList::setValue(const AtomicString& value)
-{
-    m_value = value;
-    m_tokens.set(value, false);
+    setValueInternal(value);
+    updateAfterTokenChange();
 }
 
 } // namespace WebCore

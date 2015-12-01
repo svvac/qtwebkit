@@ -25,7 +25,6 @@
 #define FontPlatformData_h
 
 #include "FontDescription.h"
-#include "FontOrientation.h"
 #include <QFont>
 #include <QHash>
 #include <QRawFont>
@@ -129,4 +128,4 @@ private:
 
 } // namespace WebCore
 
-#endif // FontPlatformData_h
+#endif // FontPlatformDataQt_h

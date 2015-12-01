@@ -76,21 +76,26 @@ String TextCheckerClientQt::getAutoCorrectSuggestionForMisspelledWord(const Stri
     return m_spellChecker->autoCorrectSuggestionForMisspelledWord(misspelledWord);
 }
 
-void TextCheckerClientQt::checkSpellingOfString(const UChar* buffer, int length, int* misspellingLocation, int* misspellingLength)
+void TextCheckerClientQt::checkSpellingOfString(StringView, int* misspellingLocation, int* misspellingLength)
 {
+    notImplemented();
+    /*
     if (!loadSpellChecker())
         return;
 
     const QString text = QString::fromRawData(reinterpret_cast<const QChar*>(buffer), length);
     m_spellChecker->checkSpellingOfString(text, misspellingLocation, misspellingLength);
+    */
 }
 
-void TextCheckerClientQt::checkGrammarOfString(const UChar* buffer, int length, Vector<GrammarDetail>& details, int* badGrammarLocation, int* badGrammarLength)
+void TextCheckerClientQt::checkGrammarOfString(StringView buffer, Vector<GrammarDetail>&, int* badGrammarLocation, int* badGrammarLength)
 {
+    notImplemented();
+    /*
     if (!loadSpellChecker())
         return;
 
-    const QString text = QString::fromRawData(reinterpret_cast<const QChar*>(buffer), length);
+    const QString text = QString(buffer.characters8());
 
     // Do Grammer check.
     QList<QWebSpellChecker::GrammarDetail> qGrammarDetails;
@@ -108,6 +113,7 @@ void TextCheckerClientQt::checkGrammarOfString(const UChar* buffer, int length, 
         webkitGrammarDetail.userDescription = qGrammarDetail.userDescription;
         details.append(webkitGrammarDetail);
     }
+    */
 }
 
 void TextCheckerClientQt::getGuessesForWord(const String& word, const String& context, Vector<String>& guesses)
@@ -118,38 +124,6 @@ void TextCheckerClientQt::getGuessesForWord(const String& word, const String& co
     QStringList guessesList;
     m_spellChecker->guessesForWord(word, context, guessesList);
     convertToVectorList(guessesList, guesses);
-}
-
-bool TextCheckerClientQt::isContinousSpellCheckingEnabled()
-{
-    if (!loadSpellChecker())
-        return false;
-
-    return m_spellChecker->isContinousSpellCheckingEnabled();
-}
-
-void TextCheckerClientQt::toggleContinousSpellChecking()
-{
-    if (!loadSpellChecker())
-        return;
-
-    m_spellChecker->toggleContinousSpellChecking();
-}
-
-bool TextCheckerClientQt::isGrammarCheckingEnabled()
-{
-    if (!loadSpellChecker())
-        return false;
-
-    return m_spellChecker->isGrammarCheckingEnabled();
-}
-
-void TextCheckerClientQt::toggleGrammarChecking()
-{
-    if (!loadSpellChecker())
-        return;
-
-    m_spellChecker->toggleGrammarChecking();
 }
 
 bool TextCheckerClientQt::loadSpellChecker()

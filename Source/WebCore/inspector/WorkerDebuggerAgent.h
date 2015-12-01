@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,41 +32,33 @@
 #ifndef WorkerDebuggerAgent_h
 #define WorkerDebuggerAgent_h
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR) && ENABLE(WORKERS)
-#include "InspectorDebuggerAgent.h"
-#include "WorkerScriptDebugServer.h"
+#include "WebDebuggerAgent.h"
 
 namespace WebCore {
 
 class WorkerGlobalScope;
 class WorkerThread;
 
-class WorkerDebuggerAgent : public InspectorDebuggerAgent {
+class WorkerDebuggerAgent final : public WebDebuggerAgent {
     WTF_MAKE_NONCOPYABLE(WorkerDebuggerAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<WorkerDebuggerAgent> create(InstrumentingAgents*, InspectorCompositeState*, WorkerGlobalScope*, InjectedScriptManager*);
+    WorkerDebuggerAgent(WorkerAgentContext&);
     virtual ~WorkerDebuggerAgent();
 
     static const char* debuggerTaskMode;
     static void interruptAndDispatchInspectorCommands(WorkerThread*);
 
+    virtual Inspector::InjectedScript injectedScriptForEval(ErrorString&, const int* executionContextId) override;
+    virtual void muteConsole() override;
+    virtual void unmuteConsole() override;
+
+    virtual void breakpointActionLog(JSC::ExecState*, const String&) override;
+
 private:
-    WorkerDebuggerAgent(InstrumentingAgents*, InspectorCompositeState*, WorkerGlobalScope*, InjectedScriptManager*);
-
-    virtual void startListeningScriptDebugServer();
-    virtual void stopListeningScriptDebugServer();
-    virtual WorkerScriptDebugServer& scriptDebugServer();
-    virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId);
-    virtual void muteConsole();
-    virtual void unmuteConsole();
-
-    WorkerScriptDebugServer m_scriptDebugServer;
-    WorkerGlobalScope* m_inspectedWorkerGlobalScope;
+    WorkerGlobalScope& m_inspectedWorkerGlobalScope;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR) && ENABLE(WORKERS)
 
 #endif // !defined(WorkerDebuggerAgent_h)

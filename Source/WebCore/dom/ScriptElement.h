@@ -35,12 +35,11 @@ class ScriptElement;
 class ScriptSourceCode;
 
 class ScriptElement : private CachedResourceClient {
-    WTF_MAKE_FAST_ALLOCATED;
 public:
-    ScriptElement(Element*, bool createdByParser, bool isEvaluated);
     virtual ~ScriptElement();
 
-    Element* element() const { return m_element; }
+    Element& element() { return m_element; }
+    const Element& element() const { return m_element; }
 
     enum LegacyTypeSupport { DisallowLegacyTypeInTypeAttribute, AllowLegacyTypeInTypeAttribute };
     bool prepareScript(const TextPosition& scriptStartPosition = TextPosition::minimumPosition(), LegacyTypeSupport = DisallowLegacyTypeInTypeAttribute);
@@ -62,13 +61,16 @@ public:
     CachedResourceHandle<CachedScript> cachedScript() { return m_cachedScript; }
 
 protected:
+    ScriptElement(Element&, bool createdByParser, bool isEvaluated);
+
     void setHaveFiredLoadEvent(bool haveFiredLoad) { m_haveFiredLoad = haveFiredLoad; }
     bool isParserInserted() const { return m_parserInserted; }
     bool alreadyStarted() const { return m_alreadyStarted; }
     bool forceAsync() const { return m_forceAsync; }
 
     // Helper functions used by our parent classes.
-    void insertedInto(ContainerNode*);
+    bool shouldCallFinishedInsertingSubtree(ContainerNode&);
+    void finishedInsertingSubtree();
     void childrenChanged();
     void handleSourceAttribute(const String& sourceUrl);
     void handleAsyncAttribute();
@@ -80,7 +82,7 @@ private:
     bool requestScript(const String& sourceUrl);
     void stopLoadRequest();
 
-    virtual void notifyFinished(CachedResource*);
+    virtual void notifyFinished(CachedResource*) override;
 
     virtual String sourceAttributeValue() const = 0;
     virtual String charsetAttributeValue() const = 0;
@@ -92,19 +94,19 @@ private:
     virtual bool deferAttributeValue() const = 0;
     virtual bool hasSourceAttribute() const = 0;
 
-    Element* m_element;
+    Element& m_element;
     CachedResourceHandle<CachedScript> m_cachedScript;
     WTF::OrdinalNumber m_startLineNumber;
-    bool m_parserInserted : 1;
-    bool m_isExternalScript : 1;
-    bool m_alreadyStarted : 1;
-    bool m_haveFiredLoad : 1;
-    bool m_willBeParserExecuted : 1; // Same as "The parser will handle executing the script."
-    bool m_readyToBeParserExecuted : 1;
-    bool m_willExecuteWhenDocumentFinishedParsing : 1;
-    bool m_forceAsync : 1;
-    bool m_willExecuteInOrder : 1;
-    bool m_requestUsesAccessControl : 1;
+    bool m_parserInserted { false };
+    bool m_isExternalScript { false };
+    bool m_alreadyStarted  { false };
+    bool m_haveFiredLoad  { false };
+    bool m_willBeParserExecuted { false }; // Same as "The parser will handle executing the script."
+    bool m_readyToBeParserExecuted { false };
+    bool m_willExecuteWhenDocumentFinishedParsing { false };
+    bool m_forceAsync { false };
+    bool m_willExecuteInOrder { false };
+    bool m_requestUsesAccessControl { false };
     String m_characterEncoding;
     String m_fallbackCharacterEncoding;
 };

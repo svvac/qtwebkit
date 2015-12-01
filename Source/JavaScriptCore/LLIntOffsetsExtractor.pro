@@ -29,6 +29,19 @@ defineTest(addIncludePaths) {
 
 addIncludePaths()
 
+BYTECODES_DEPENDENCY = \
+    $$PWD/generate-bytecode-files \
+    $$PWD/bytecode/BytecodeList.json
+
+bytecodes.output = $$PWD/Bytecodes.h $$PWD/llint/InitBytecodes.asm
+bytecodes.script = $$PWD/generate-bytecode-files
+bytecodes.commands = python $$bytecodes.script -I$$PWD ${QMAKE_FILE_NAME} ${QMAKE_FILE_OUT}
+bytecodes.depends = $$BYTECODES_DEPENDENCY
+bytecodes.input = --bytecodes_h $$PWD/Bytecodes.h --init_bytecodes_asm \
+  $$PWD/InitBytecodes.asm $$PWD/bytecode/BytecodeList.json
+bytecodes.CONFIG += no_link
+GENERATORS += bytecodes
+
 LLINT_DEPENDENCY = \
     $$PWD/llint/LowLevelInterpreter.asm \
     $$PWD/llint/LowLevelInterpreter32_64.asm \
@@ -56,6 +69,7 @@ llint.depends = $$LLINT_DEPENDENCY
 llint.commands = ruby $$llint.script ${QMAKE_FILE_NAME} ${QMAKE_FILE_OUT}
 llint.CONFIG += no_link
 QMAKE_EXTRA_COMPILERS += llint
+
 
 macx {
     DESTDIR = $$targetSubDir()

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -47,6 +47,7 @@
 #import "ColorMac.h"
 #import "ContextMenuController.h"
 #import "Font.h"
+#import "FontCascade.h"
 #import "Frame.h"
 #import "FrameLoaderClient.h"
 #import "FrameSelection.h"
@@ -63,10 +64,8 @@
 #import "RenderView.h"
 #import "RenderWidget.h"
 #import "ScrollView.h"
-#import "SimpleFontData.h"
 #import "TextCheckerClient.h"
 #import "TextCheckingHelper.h"
-#import "TextIterator.h"
 #import "VisibleUnits.h"
 #import "WebCoreFrameView.h"
 #import "WebCoreObjCExtras.h"
@@ -75,15 +74,12 @@
 
 using namespace WebCore;
 using namespace HTMLNames;
-using namespace std;
 
 static NSArray *convertMathPairsToNSArray(const AccessibilityObject::AccessibilityMathMultiscriptPairs& pairs, NSString *subscriptKey, NSString *superscriptKey)
 {
-    unsigned length = pairs.size();
-    NSMutableArray *array = [NSMutableArray arrayWithCapacity:length];
-    for (unsigned i = 0; i < length; ++i) {
+    NSMutableArray *array = [NSMutableArray arrayWithCapacity:pairs.size()];
+    for (const auto& pair : pairs) {
         NSMutableDictionary *pairDictionary = [NSMutableDictionary dictionary];
-        pair<AccessibilityObject*, AccessibilityObject*> pair = pairs[i];
         if (pair.first && pair.first->wrapper() && !pair.first->accessibilityIsIgnored())
             [pairDictionary setObject:pair.first->wrapper() forKey:subscriptKey];
         if (pair.second && pair.second->wrapper() && !pair.second->accessibilityIsIgnored())
@@ -106,7 +102,7 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
 
 - (void)detach
 {
-    m_object = 0;
+    m_object = nullptr;
 }
 
 - (BOOL)updateObjectBackingStore
@@ -151,7 +147,7 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
 
 // This should be the "visible" text that's actually on the screen if possible.
 // If there's alternative text, that can override the title.
-- (NSString *)accessibilityTitle
+- (NSString *)baseAccessibilityTitle
 {
     // Static text objects should not have a title. Its content is communicated in its AXValue.
     if (m_object->roleValue() == StaticTextRole)
@@ -166,10 +162,7 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
     Vector<AccessibilityText> textOrder;
     m_object->accessibilityText(textOrder);
     
-    unsigned length = textOrder.size();
-    for (unsigned k = 0; k < length; k++) {
-        const AccessibilityText& text = textOrder[k];
-        
+    for (const auto& text : textOrder) {
         // If we have alternative text, then we should not expose a title.
         if (text.textSource == AlternativeText)
             break;
@@ -182,17 +175,12 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
         // that text as our title.
         if (text.textSource == LabelByElementText && !m_object->exposesTitleUIElement())
             return text.text;
-        
-        // FIXME: The title tag is used in certain cases for the title. This usage should
-        // probably be in the description field since it's not "visible".
-        if (text.textSource == TitleTagText && ![self titleTagShouldBeUsedInDescriptionField])
-            return text.text;
     }
     
     return [NSString string];
 }
 
-- (NSString *)accessibilityDescription
+- (NSString *)baseAccessibilityDescription
 {
     // Static text objects should not have a description. Its content is communicated in its AXValue.
     // One exception is the media control labels that have a value and a description. Those are set programatically.
@@ -202,30 +190,35 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
     Vector<AccessibilityText> textOrder;
     m_object->accessibilityText(textOrder);
     
-    unsigned length = textOrder.size();
-    for (unsigned k = 0; k < length; k++) {
-        const AccessibilityText& text = textOrder[k];
-        
+    bool visibleTextAvailable = false;
+    for (const auto& text : textOrder) {
         if (text.textSource == AlternativeText)
             return text.text;
         
-        if (text.textSource == TitleTagText && [self titleTagShouldBeUsedInDescriptionField])
+        switch (text.textSource) {
+        case VisibleText:
+        case ChildrenText:
+        case LabelByElementText:
+            visibleTextAvailable = true;
+            break;
+        default:
+            break;
+        }
+        
+        if (text.textSource == TitleTagText && !visibleTextAvailable)
             return text.text;
     }
     
     return [NSString string];
 }
 
-- (NSString *)accessibilityHelpText
+- (NSString *)baseAccessibilityHelpText
 {
     Vector<AccessibilityText> textOrder;
     m_object->accessibilityText(textOrder);
     
-    unsigned length = textOrder.size();
     bool descriptiveTextAvailable = false;
-    for (unsigned k = 0; k < length; k++) {
-        const AccessibilityText& text = textOrder[k];
-        
+    for (const auto& text : textOrder) {
         if (text.textSource == HelpText || text.textSource == SummaryText)
             return text.text;
         
@@ -237,6 +230,7 @@ static NSArray *convertMathPairsToNSArray(const AccessibilityObject::Accessibili
         case ChildrenText:
         case LabelByElementText:
             descriptiveTextAvailable = true;
+            break;
         default:
             break;
         }
@@ -253,36 +247,35 @@ struct PathConversionInfo {
     CGMutablePathRef path;
 };
 
-static void ConvertPathToScreenSpaceFunction(void* info, const PathElement* element)
+static void convertPathToScreenSpaceFunction(PathConversionInfo& conversion, const PathElement& element)
 {
-    PathConversionInfo* conversion = (PathConversionInfo*)info;
-    WebAccessibilityObjectWrapperBase *wrapper = conversion->wrapper;
-    CGMutablePathRef newPath = conversion->path;
-    switch (element->type) {
+    WebAccessibilityObjectWrapperBase *wrapper = conversion.wrapper;
+    CGMutablePathRef newPath = conversion.path;
+    switch (element.type) {
     case PathElementMoveToPoint:
     {
-        CGPoint newPoint = [wrapper convertPointToScreenSpace:element->points[0]];
+        CGPoint newPoint = [wrapper convertPointToScreenSpace:element.points[0]];
         CGPathMoveToPoint(newPath, nil, newPoint.x, newPoint.y);
         break;
     }
     case PathElementAddLineToPoint:
     {
-        CGPoint newPoint = [wrapper convertPointToScreenSpace:element->points[0]];
+        CGPoint newPoint = [wrapper convertPointToScreenSpace:element.points[0]];
         CGPathAddLineToPoint(newPath, nil, newPoint.x, newPoint.y);
         break;
     }
     case PathElementAddQuadCurveToPoint:
     {
-        CGPoint newPoint1 = [wrapper convertPointToScreenSpace:element->points[0]];
-        CGPoint newPoint2 = [wrapper convertPointToScreenSpace:element->points[1]];
+        CGPoint newPoint1 = [wrapper convertPointToScreenSpace:element.points[0]];
+        CGPoint newPoint2 = [wrapper convertPointToScreenSpace:element.points[1]];
         CGPathAddQuadCurveToPoint(newPath, nil, newPoint1.x, newPoint1.y, newPoint2.x, newPoint2.y);
         break;
     }
     case PathElementAddCurveToPoint:
     {
-        CGPoint newPoint1 = [wrapper convertPointToScreenSpace:element->points[0]];
-        CGPoint newPoint2 = [wrapper convertPointToScreenSpace:element->points[1]];
-        CGPoint newPoint3 = [wrapper convertPointToScreenSpace:element->points[2]];
+        CGPoint newPoint1 = [wrapper convertPointToScreenSpace:element.points[0]];
+        CGPoint newPoint2 = [wrapper convertPointToScreenSpace:element.points[1]];
+        CGPoint newPoint3 = [wrapper convertPointToScreenSpace:element.points[2]];
         CGPathAddCurveToPoint(newPath, nil, newPoint1.x, newPoint1.y, newPoint2.x, newPoint2.y, newPoint3.x, newPoint3.y);
         break;
     }
@@ -297,7 +290,9 @@ static void ConvertPathToScreenSpaceFunction(void* info, const PathElement* elem
 - (CGPathRef)convertPathToScreenSpace:(Path &)path
 {
     PathConversionInfo conversion = { self, CGPathCreateMutable() };
-    path.apply(&conversion, ConvertPathToScreenSpaceFunction);    
+    path.apply([&conversion](const PathElement& pathElement) {
+        convertPathToScreenSpaceFunction(conversion, pathElement);
+    });
     return (CGPathRef)[(id)conversion.path autorelease];
 }
 
@@ -389,13 +384,66 @@ static BOOL accessibilityShouldRepostNotifications;
 + (void)accessibilitySetShouldRepostNotifications:(BOOL)repost
 {
     accessibilityShouldRepostNotifications = repost;
+#if PLATFORM(MAC)
+    AXObjectCache::setShouldRepostNotificationsForTests(repost);
+#endif
 }
 
 - (void)accessibilityPostedNotification:(NSString *)notificationName
 {
+    if (accessibilityShouldRepostNotifications)
+        [self accessibilityPostedNotification:notificationName userInfo:nil];
+}
+
+static bool isValueTypeSupported(id value)
+{
+    return [value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]] || [value isKindOfClass:[WebAccessibilityObjectWrapperBase class]];
+}
+
+static NSArray *arrayRemovingNonSupportedTypes(NSArray *array)
+{
+    ASSERT([array isKindOfClass:[NSArray class]]);
+    NSMutableArray *mutableArray = [array mutableCopy];
+    for (NSUInteger i = 0; i < [mutableArray count];) {
+        id value = [mutableArray objectAtIndex:i];
+        if ([value isKindOfClass:[NSDictionary class]])
+            [mutableArray replaceObjectAtIndex:i withObject:dictionaryRemovingNonSupportedTypes(value)];
+        else if ([value isKindOfClass:[NSArray class]])
+            [mutableArray replaceObjectAtIndex:i withObject:arrayRemovingNonSupportedTypes(value)];
+        else if (!isValueTypeSupported(value)) {
+            [mutableArray removeObjectAtIndex:i];
+            continue;
+        }
+        i++;
+    }
+    return [mutableArray autorelease];
+}
+
+static NSDictionary *dictionaryRemovingNonSupportedTypes(NSDictionary *dictionary)
+{
+    if (!dictionary)
+        return nil;
+    ASSERT([dictionary isKindOfClass:[NSDictionary class]]);
+    NSMutableDictionary *mutableDictionary = [dictionary mutableCopy];
+    for (NSString *key in dictionary) {
+        id value = [dictionary objectForKey:key];
+        if ([value isKindOfClass:[NSDictionary class]])
+            [mutableDictionary setObject:dictionaryRemovingNonSupportedTypes(value) forKey:key];
+        else if ([value isKindOfClass:[NSArray class]])
+            [mutableDictionary setObject:arrayRemovingNonSupportedTypes(value) forKey:key];
+        else if (!isValueTypeSupported(value))
+            [mutableDictionary removeObjectForKey:key];
+    }
+    return [mutableDictionary autorelease];
+}
+
+- (void)accessibilityPostedNotification:(NSString *)notificationName userInfo:(NSDictionary *)userInfo
+{
     if (accessibilityShouldRepostNotifications) {
-        NSDictionary* userInfo = [NSDictionary dictionaryWithObjectsAndKeys:notificationName, @"notificationName", nil];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"AXDRTNotification" object:self userInfo:userInfo];
+        ASSERT(notificationName);
+        userInfo = dictionaryRemovingNonSupportedTypes(userInfo);
+        NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:notificationName, @"notificationName", userInfo, @"userInfo", nil];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"AXDRTNotification" object:self userInfo:info];
     }
 }
 

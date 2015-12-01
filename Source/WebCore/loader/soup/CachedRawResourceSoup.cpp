@@ -17,6 +17,9 @@
  */
 
 #include "config.h"
+
+#if USE(SOUP)
+
 #include "CachedRawResource.h"
 
 #include "CachedRawResourceClient.h"
@@ -32,7 +35,9 @@ char* CachedRawResource::getOrCreateReadBuffer(size_t requestedSize, size_t& act
             return bufferPtr;
     }
 
-    return 0;
+    return nullptr;
 }
 
 } // namespace WebCore
+
+#endif

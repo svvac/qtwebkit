@@ -32,16 +32,25 @@
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamTrackEvent> MediaStreamTrackEvent::create()
+MediaStreamTrackEventInit::MediaStreamTrackEventInit()
+    : track(nullptr)
 {
-    return adoptRef(new MediaStreamTrackEvent);
 }
 
-PassRefPtr<MediaStreamTrackEvent> MediaStreamTrackEvent::create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStreamTrack> track)
+Ref<MediaStreamTrackEvent> MediaStreamTrackEvent::create()
 {
-    return adoptRef(new MediaStreamTrackEvent(type, canBubble, cancelable, track));
+    return adoptRef(*new MediaStreamTrackEvent);
 }
 
+Ref<MediaStreamTrackEvent> MediaStreamTrackEvent::create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStreamTrack> track)
+{
+    return adoptRef(*new MediaStreamTrackEvent(type, canBubble, cancelable, track));
+}
+
+Ref<MediaStreamTrackEvent> MediaStreamTrackEvent::create(const AtomicString& type, const MediaStreamTrackEventInit& initializer)
+{
+    return adoptRef(*new MediaStreamTrackEvent(type, initializer));
+}
 
 MediaStreamTrackEvent::MediaStreamTrackEvent()
 {
@@ -50,6 +59,12 @@ MediaStreamTrackEvent::MediaStreamTrackEvent()
 MediaStreamTrackEvent::MediaStreamTrackEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStreamTrack> track)
     : Event(type, canBubble, cancelable)
     , m_track(track)
+{
+}
+
+MediaStreamTrackEvent::MediaStreamTrackEvent(const AtomicString& type, const MediaStreamTrackEventInit& initializer)
+    : Event(type, initializer)
+    , m_track(initializer.track)
 {
 }
 
@@ -62,9 +77,9 @@ MediaStreamTrack* MediaStreamTrackEvent::track() const
     return m_track.get();
 }
 
-const AtomicString& MediaStreamTrackEvent::interfaceName() const
+EventInterface MediaStreamTrackEvent::eventInterface() const
 {
-    return eventNames().interfaceForMediaStreamTrackEvent;
+    return MediaStreamTrackEventInterfaceType;
 }
 
 } // namespace WebCore

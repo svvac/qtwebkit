@@ -26,7 +26,9 @@
 #include "config.h"
 #include "ScrollingThread.h"
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
+
+#include <mutex>
 
 namespace WebCore {
 
@@ -34,7 +36,7 @@ void ScrollingThread::initializeRunLoop()
 {
     // Initialize the run loop.
     {
-        MutexLocker locker(m_initializeRunLoopConditionMutex);
+        std::lock_guard<Lock> lock(m_initializeRunLoopMutex);
 
         m_threadRunLoop = CFRunLoopGetCurrent();
 
@@ -42,7 +44,7 @@ void ScrollingThread::initializeRunLoop()
         m_threadRunLoopSource = adoptCF(CFRunLoopSourceCreate(0, 0, &context));
         CFRunLoopAddSource(CFRunLoopGetCurrent(), m_threadRunLoopSource.get(), kCFRunLoopDefaultMode);
 
-        m_initializeRunLoopCondition.broadcast();
+        m_initializeRunLoopConditionVariable.notifyAll();
     }
 
     ASSERT(isCurrentThread());
@@ -63,11 +65,11 @@ void ScrollingThread::threadRunLoopSourceCallback(void* scrollingThread)
 
 void ScrollingThread::threadRunLoopSourceCallback()
 {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    dispatchFunctionsFromScrollingThread();
-    [pool drain];
+    @autoreleasepool {
+        dispatchFunctionsFromScrollingThread();
+    }
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(ASYNC_SCROLLING)

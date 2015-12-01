@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,11 +24,11 @@
 
 namespace WebCore {
 
-LocalCurrentGraphicsContext::LocalCurrentGraphicsContext(GraphicsContext* graphicsContext)
-    : m_didSetGraphicsContext(false)
+LocalCurrentGraphicsContext::LocalCurrentGraphicsContext(GraphicsContext& graphicsContext)
+    : m_savedGraphicsContext(graphicsContext)
+    , m_didSetGraphicsContext(false)
 {
-    m_savedGraphicsContext = graphicsContext;
-    graphicsContext->save();
+    graphicsContext.save();
 
     CGContextRef cgContext = this->cgContext();
     if (cgContext == [[NSGraphicsContext currentContext] graphicsPort]) {
@@ -49,12 +49,12 @@ LocalCurrentGraphicsContext::~LocalCurrentGraphicsContext()
         [m_savedNSGraphicsContext release];
     }
 
-    m_savedGraphicsContext->restore();
+    m_savedGraphicsContext.restore();
 }
 
 CGContextRef LocalCurrentGraphicsContext::cgContext()
 {
-    CGContextRef cgContext = m_savedGraphicsContext->platformContext();
+    CGContextRef cgContext = m_savedGraphicsContext.platformContext();
     return cgContext;
 }
 

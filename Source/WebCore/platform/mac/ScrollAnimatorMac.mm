@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,47 +30,44 @@
 #include "ScrollAnimatorMac.h"
 
 #include "BlockExceptions.h"
-#include "EmptyProtocolDefinitions.h"
 #include "FloatPoint.h"
+#include "GraphicsLayer.h"
 #include "NSScrollerImpDetails.h"
-#include "PlatformGestureEvent.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollView.h"
 #include "ScrollableArea.h"
 #include "ScrollbarTheme.h"
 #include "ScrollbarThemeMac.h"
 #include "WebCoreSystemInterface.h"
-#include <wtf/PassOwnPtr.h>
 
 using namespace WebCore;
-using namespace std;
 
 static bool supportsUIStateTransitionProgress()
 {
     // FIXME: This is temporary until all platforms that support ScrollbarPainter support this part of the API.
-    static bool globalSupportsUIStateTransitionProgress = [NSClassFromString(@"NSScrollerImp") instancesRespondToSelector:@selector(mouseEnteredScroller)];
+    static const bool globalSupportsUIStateTransitionProgress = [NSClassFromString(@"NSScrollerImp") instancesRespondToSelector:@selector(mouseEnteredScroller)];
     return globalSupportsUIStateTransitionProgress;
 }
 
 static bool supportsExpansionTransitionProgress()
 {
-    static bool globalSupportsExpansionTransitionProgress = [NSClassFromString(@"NSScrollerImp") instancesRespondToSelector:@selector(expansionTransitionProgress)];
+    static const bool globalSupportsExpansionTransitionProgress = [NSClassFromString(@"NSScrollerImp") instancesRespondToSelector:@selector(expansionTransitionProgress)];
     return globalSupportsExpansionTransitionProgress;
 }
 
 static bool supportsContentAreaScrolledInDirection()
 {
-    static bool globalSupportsContentAreaScrolledInDirection = [NSClassFromString(@"NSScrollerImpPair") instancesRespondToSelector:@selector(contentAreaScrolledInDirection:)];
+    static const bool globalSupportsContentAreaScrolledInDirection = [NSClassFromString(@"NSScrollerImpPair") instancesRespondToSelector:@selector(contentAreaScrolledInDirection:)];
     return globalSupportsContentAreaScrolledInDirection;
 }
 
 static ScrollbarThemeMac* macScrollbarTheme()
 {
-    ScrollbarTheme* scrollbarTheme = ScrollbarTheme::theme();
-    return !scrollbarTheme->isMockTheme() ? static_cast<ScrollbarThemeMac*>(scrollbarTheme) : 0;
+    ScrollbarTheme& scrollbarTheme = ScrollbarTheme::theme();
+    return !scrollbarTheme.isMockTheme() ? static_cast<ScrollbarThemeMac*>(&scrollbarTheme) : nullptr;
 }
 
-static ScrollbarPainter scrollbarPainterForScrollbar(Scrollbar* scrollbar)
+static ScrollbarPainter scrollbarPainterForScrollbar(Scrollbar& scrollbar)
 {
     if (ScrollbarThemeMac* scrollbarTheme = macScrollbarTheme())
         return scrollbarTheme->painterForScrollbar(scrollbar);
@@ -255,7 +252,7 @@ static NSSize abs(NSSize size)
     if (!scrollbar)
         return NSZeroPoint;
 
-    ASSERT(scrollerImp == scrollbarPainterForScrollbar(scrollbar));
+    ASSERT(scrollerImp == scrollbarPainterForScrollbar(*scrollbar));
 
     return scrollbar->convertFromContainingView(WebCore::IntPoint(pointInContentArea));
 }
@@ -268,10 +265,10 @@ static NSSize abs(NSSize size)
     if (!_scrollableArea)
         return;
 
-    if (!_scrollableArea->scrollbarsCanBeActive())
+    if ([scrollerImpPair overlayScrollerStateIsLocked])
         return;
 
-    _scrollableArea->scrollAnimator()->contentAreaWillPaint();
+    _scrollableArea->scrollAnimator().contentAreaWillPaint();
 }
 
 - (void)scrollerImpPair:(id)scrollerImpPair updateScrollerStyleForNewRecommendedScrollerStyle:(NSScrollerStyle)newRecommendedScrollerStyle
@@ -281,7 +278,7 @@ static NSSize abs(NSSize size)
 
     [scrollerImpPair setScrollerStyle:newRecommendedScrollerStyle];
 
-    static_cast<ScrollAnimatorMac*>(_scrollableArea->scrollAnimator())->updateScrollerStyle();
+    static_cast<ScrollAnimatorMac&>(_scrollableArea->scrollAnimator()).updateScrollerStyle();
 }
 
 @end
@@ -326,7 +323,7 @@ enum FeatureToAnimate {
 {
     ASSERT(_scrollbar);
 
-    _scrollbarPainter = scrollbarPainterForScrollbar(_scrollbar);
+    _scrollbarPainter = scrollbarPainterForScrollbar(*_scrollbar);
 
     [super startAnimation];
 }
@@ -355,20 +352,21 @@ enum FeatureToAnimate {
 
     switch (_featureToAnimate) {
     case ThumbAlpha:
-        [_scrollbarPainter.get() setKnobAlpha:currentValue];
+        [_scrollbarPainter setKnobAlpha:currentValue];
         break;
     case TrackAlpha:
-        [_scrollbarPainter.get() setTrackAlpha:currentValue];
+        [_scrollbarPainter setTrackAlpha:currentValue];
         break;
     case UIStateTransition:
-        [_scrollbarPainter.get() setUiStateTransitionProgress:currentValue];
+        [_scrollbarPainter setUiStateTransitionProgress:currentValue];
         break;
     case ExpansionTransition:
-        [_scrollbarPainter.get() setExpansionTransitionProgress:currentValue];
+        [_scrollbarPainter setExpansionTransitionProgress:currentValue];
         break;
     }
 
-    _scrollbar->invalidate();
+    if (!_scrollbar->supportsUpdateOnSecondaryThread())
+        _scrollbar->invalidate();
 }
 
 - (void)invalidate
@@ -409,16 +407,16 @@ enum FeatureToAnimate {
 - (void)cancelAnimations
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    [_knobAlphaAnimation.get() stopAnimation];
-    [_trackAlphaAnimation.get() stopAnimation];
-    [_uiStateTransitionAnimation.get() stopAnimation];
-    [_expansionTransitionAnimation.get() stopAnimation];
+    [_knobAlphaAnimation stopAnimation];
+    [_trackAlphaAnimation stopAnimation];
+    [_uiStateTransitionAnimation stopAnimation];
+    [_expansionTransitionAnimation stopAnimation];
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
 - (ScrollAnimatorMac*)scrollAnimator
 {
-    return static_cast<ScrollAnimatorMac*>(_scrollbar->scrollableArea()->scrollAnimator());
+    return &static_cast<ScrollAnimatorMac&>(_scrollbar->scrollableArea().scrollAnimator());
 }
 
 - (NSRect)convertRectToBacking:(NSRect)aRect
@@ -439,9 +437,14 @@ enum FeatureToAnimate {
     if (!ScrollbarThemeMac::isCurrentlyDrawingIntoLayer())
         return nil;
 
-    // FIXME: This should attempt to return an actual layer.
+    GraphicsLayer* layer;
+    if (_scrollbar->orientation() == VerticalScrollbar)
+        layer = _scrollbar->scrollableArea().layerForVerticalScrollbar();
+    else
+        layer = _scrollbar->scrollableArea().layerForHorizontalScrollbar();
+
     static CALayer *dummyLayer = [[CALayer alloc] init];
-    return dummyLayer;
+    return layer ? layer->platformLayer() : dummyLayer;
 }
 
 - (NSPoint)mouseLocationInScrollerForScrollerImp:(id)scrollerImp
@@ -449,21 +452,36 @@ enum FeatureToAnimate {
     if (!_scrollbar)
         return NSZeroPoint;
 
-    ASSERT_UNUSED(scrollerImp, scrollerImp == scrollbarPainterForScrollbar(_scrollbar));
+    ASSERT_UNUSED(scrollerImp, scrollerImp == scrollbarPainterForScrollbar(*_scrollbar));
 
-    return _scrollbar->convertFromContainingView(_scrollbar->scrollableArea()->lastKnownMousePosition());
+    return _scrollbar->convertFromContainingView(_scrollbar->scrollableArea().lastKnownMousePosition());
+}
+
+- (NSRect)convertRectToLayer:(NSRect)rect
+{
+    return rect;
+}
+
+- (BOOL)shouldUseLayerPerPartForScrollerImp:(id)scrollerImp
+{
+    UNUSED_PARAM(scrollerImp);
+
+    if (!_scrollbar)
+        return false;
+
+    return _scrollbar->supportsUpdateOnSecondaryThread();
 }
 
 - (void)setUpAlphaAnimation:(RetainPtr<WebScrollbarPartAnimation>&)scrollbarPartAnimation scrollerPainter:(ScrollbarPainter)scrollerPainter part:(WebCore::ScrollbarPart)part animateAlphaTo:(CGFloat)newAlpha duration:(NSTimeInterval)duration
 {
-    // If the user has scrolled the page, then the scrollbars must be animated here. 
+    // If the user has scrolled the page, then the scrollbars must be animated here.
     // This overrides the early returns.
     bool mustAnimate = [self scrollAnimator]->haveScrolledSincePageLoad();
 
     if ([self scrollAnimator]->scrollbarPaintTimerIsActive() && !mustAnimate)
         return;
 
-    if (_scrollbar->scrollableArea()->shouldSuspendScrollAnimations() && !mustAnimate) {
+    if (_scrollbar->scrollableArea().shouldSuspendScrollAnimations() && !mustAnimate) {
         [self scrollAnimator]->startScrollbarPaintTimer();
         return;
     }
@@ -473,9 +491,12 @@ enum FeatureToAnimate {
 
     // If we are currently animating, stop
     if (scrollbarPartAnimation) {
-        [scrollbarPartAnimation.get() stopAnimation];
+        [scrollbarPartAnimation stopAnimation];
         scrollbarPartAnimation = nil;
     }
+
+    if (ScrollbarThemeMac* macTheme = macScrollbarTheme())
+        macTheme->setPaintCharacteristicsForScrollbar(*_scrollbar);
 
     if (part == WebCore::ThumbPart && _scrollbar->orientation() == VerticalScrollbar) {
         if (newAlpha == 1) {
@@ -485,12 +506,12 @@ enum FeatureToAnimate {
             [self scrollAnimator]->setVisibleScrollerThumbRect(IntRect());
     }
 
-    scrollbarPartAnimation = adoptNS([[WebScrollbarPartAnimation alloc] initWithScrollbar:_scrollbar 
+    scrollbarPartAnimation = adoptNS([[WebScrollbarPartAnimation alloc] initWithScrollbar:_scrollbar
                                                                        featureToAnimate:part == ThumbPart ? ThumbAlpha : TrackAlpha
                                                                             animateFrom:part == ThumbPart ? [scrollerPainter knobAlpha] : [scrollerPainter trackAlpha]
                                                                               animateTo:newAlpha 
                                                                                duration:duration]);
-    [scrollbarPartAnimation.get() startAnimation];
+    [scrollbarPartAnimation startAnimation];
 }
 
 - (void)scrollerImp:(id)scrollerImp animateKnobAlphaTo:(CGFloat)newKnobAlpha duration:(NSTimeInterval)duration
@@ -498,14 +519,20 @@ enum FeatureToAnimate {
     if (!_scrollbar)
         return;
 
-    ASSERT(scrollerImp == scrollbarPainterForScrollbar(_scrollbar));
+    ASSERT(scrollerImp == scrollbarPainterForScrollbar(*_scrollbar));
 
     ScrollbarPainter scrollerPainter = (ScrollbarPainter)scrollerImp;
-    if (_scrollbar->scrollableArea()->scrollbarAnimationsAreSuppressed()) {
+    if (![self scrollAnimator]->scrollbarsCanBeActive()) {
         [scrollerImp setKnobAlpha:0];
         _scrollbar->invalidate();
         return;
     }
+
+    // If we are fading the scrollbar away, that is a good indication that we are no longer going to
+    // be moving it around on the scrolling thread. Calling [scrollerPainter setUsePresentationValue:NO]
+    // will pass that information on to the ScrollbarPainter API.
+    if (newKnobAlpha == 0 && _scrollbar->supportsUpdateOnSecondaryThread())
+        [scrollerPainter setUsePresentationValue:NO];
 
     [self setUpAlphaAnimation:_knobAlphaAnimation scrollerPainter:scrollerPainter part:WebCore::ThumbPart animateAlphaTo:newKnobAlpha duration:duration];
 }
@@ -515,8 +542,8 @@ enum FeatureToAnimate {
     if (!_scrollbar)
         return;
 
-    ASSERT(scrollerImp == scrollbarPainterForScrollbar(_scrollbar));
-    
+    ASSERT(scrollerImp == scrollbarPainterForScrollbar(*_scrollbar));
+
     ScrollbarPainter scrollerPainter = (ScrollbarPainter)scrollerImp;
     [self setUpAlphaAnimation:_trackAlphaAnimation scrollerPainter:scrollerPainter part:WebCore::BackTrackPart animateAlphaTo:newTrackAlpha duration:duration];
 }
@@ -529,12 +556,16 @@ enum FeatureToAnimate {
     if (!supportsUIStateTransitionProgress())
         return;
 
-    ASSERT(scrollerImp == scrollbarPainterForScrollbar(_scrollbar));
+    ASSERT(scrollerImp == scrollbarPainterForScrollbar(*_scrollbar));
 
     ScrollbarPainter scrollbarPainter = (ScrollbarPainter)scrollerImp;
 
     // UIStateTransition always animates to 1. In case an animation is in progress this avoids a hard transition.
     [scrollbarPainter setUiStateTransitionProgress:1 - [scrollerImp uiStateTransitionProgress]];
+
+    // If the UI state transition is happening, then we are no longer moving the scrollbar on the scrolling thread.
+    if (_scrollbar->supportsUpdateOnSecondaryThread())
+        [scrollbarPainter setUsePresentationValue:NO];
 
     if (!_uiStateTransitionAnimation)
         _uiStateTransitionAnimation = adoptNS([[WebScrollbarPartAnimation alloc] initWithScrollbar:_scrollbar 
@@ -544,11 +575,11 @@ enum FeatureToAnimate {
                                                                                         duration:duration]);
     else {
         // If we don't need to initialize the animation, just reset the values in case they have changed.
-        [_uiStateTransitionAnimation.get() setStartValue:[scrollbarPainter uiStateTransitionProgress]];
-        [_uiStateTransitionAnimation.get() setEndValue:1.0];
-        [_uiStateTransitionAnimation.get() setDuration:duration];
+        [_uiStateTransitionAnimation setStartValue:[scrollbarPainter uiStateTransitionProgress]];
+        [_uiStateTransitionAnimation setEndValue:1.0];
+        [_uiStateTransitionAnimation setDuration:duration];
     }
-    [_uiStateTransitionAnimation.get() startAnimation];
+    [_uiStateTransitionAnimation startAnimation];
 }
 
 - (void)scrollerImp:(id)scrollerImp animateExpansionTransitionWithDuration:(NSTimeInterval)duration
@@ -559,7 +590,7 @@ enum FeatureToAnimate {
     if (!supportsExpansionTransitionProgress())
         return;
 
-    ASSERT(scrollerImp == scrollbarPainterForScrollbar(_scrollbar));
+    ASSERT(scrollerImp == scrollbarPainterForScrollbar(*_scrollbar));
 
     ScrollbarPainter scrollbarPainter = (ScrollbarPainter)scrollerImp;
 
@@ -574,11 +605,11 @@ enum FeatureToAnimate {
                                                                                           duration:duration]);
     } else {
         // If we don't need to initialize the animation, just reset the values in case they have changed.
-        [_expansionTransitionAnimation.get() setStartValue:[scrollbarPainter uiStateTransitionProgress]];
-        [_expansionTransitionAnimation.get() setEndValue:1.0];
-        [_expansionTransitionAnimation.get() setDuration:duration];
+        [_expansionTransitionAnimation setStartValue:[scrollbarPainter uiStateTransitionProgress]];
+        [_expansionTransitionAnimation setEndValue:1.0];
+        [_expansionTransitionAnimation setDuration:duration];
     }
-    [_expansionTransitionAnimation.get() startAnimation];
+    [_expansionTransitionAnimation startAnimation];
 }
 
 - (void)scrollerImp:(id)scrollerImp overlayScrollerStateChangedTo:(NSUInteger)newOverlayScrollerState
@@ -591,10 +622,10 @@ enum FeatureToAnimate {
 {
     _scrollbar = 0;
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    [_knobAlphaAnimation.get() invalidate];
-    [_trackAlphaAnimation.get() invalidate];
-    [_uiStateTransitionAnimation.get() invalidate];
-    [_expansionTransitionAnimation.get() invalidate];
+    [_knobAlphaAnimation invalidate];
+    [_trackAlphaAnimation invalidate];
+    [_uiStateTransitionAnimation invalidate];
+    [_expansionTransitionAnimation invalidate];
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
@@ -602,54 +633,41 @@ enum FeatureToAnimate {
 
 namespace WebCore {
 
-PassOwnPtr<ScrollAnimator> ScrollAnimator::create(ScrollableArea* scrollableArea)
+std::unique_ptr<ScrollAnimator> ScrollAnimator::create(ScrollableArea& scrollableArea)
 {
-    return adoptPtr(new ScrollAnimatorMac(scrollableArea));
+    return std::make_unique<ScrollAnimatorMac>(scrollableArea);
 }
 
-ScrollAnimatorMac::ScrollAnimatorMac(ScrollableArea* scrollableArea)
+ScrollAnimatorMac::ScrollAnimatorMac(ScrollableArea& scrollableArea)
     : ScrollAnimator(scrollableArea)
-    , m_initialScrollbarPaintTimer(this, &ScrollAnimatorMac::initialScrollbarPaintTimerFired)
-    , m_sendContentAreaScrolledTimer(this, &ScrollAnimatorMac::sendContentAreaScrolledTimerFired)
-#if ENABLE(RUBBER_BANDING)
-    , m_scrollElasticityController(this)
-    , m_snapRubberBandTimer(this, &ScrollAnimatorMac::snapRubberBandTimerFired)
-#endif
+    , m_initialScrollbarPaintTimer(*this, &ScrollAnimatorMac::initialScrollbarPaintTimerFired)
+    , m_sendContentAreaScrolledTimer(*this, &ScrollAnimatorMac::sendContentAreaScrolledTimerFired)
     , m_haveScrolledSincePageLoad(false)
     , m_needsScrollerStyleUpdate(false)
 {
     m_scrollAnimationHelperDelegate = adoptNS([[WebScrollAnimationHelperDelegate alloc] initWithScrollAnimator:this]);
     m_scrollAnimationHelper = adoptNS([[NSClassFromString(@"NSScrollAnimationHelper") alloc] initWithDelegate:m_scrollAnimationHelperDelegate.get()]);
 
-    if (isScrollbarOverlayAPIAvailable()) {
-        m_scrollbarPainterControllerDelegate = adoptNS([[WebScrollbarPainterControllerDelegate alloc] initWithScrollableArea:scrollableArea]);
-        m_scrollbarPainterController = [[[NSClassFromString(@"NSScrollerImpPair") alloc] init] autorelease];
-        [m_scrollbarPainterController.get() setDelegate:m_scrollbarPainterControllerDelegate.get()];
-        [m_scrollbarPainterController.get() setScrollerStyle:recommendedScrollerStyle()];
-    }
+    m_scrollbarPainterControllerDelegate = adoptNS([[WebScrollbarPainterControllerDelegate alloc] initWithScrollableArea:&scrollableArea]);
+    m_scrollbarPainterController = adoptNS([[NSClassFromString(@"NSScrollerImpPair") alloc] init]);
+    [m_scrollbarPainterController setDelegate:(id)m_scrollbarPainterControllerDelegate.get()];
+    [m_scrollbarPainterController setScrollerStyle:recommendedScrollerStyle()];
 }
 
 ScrollAnimatorMac::~ScrollAnimatorMac()
 {
-    if (isScrollbarOverlayAPIAvailable()) {
-        BEGIN_BLOCK_OBJC_EXCEPTIONS;
-        [m_scrollbarPainterControllerDelegate.get() invalidate];
-        [m_scrollbarPainterController.get() setDelegate:nil];
-        [m_horizontalScrollbarPainterDelegate.get() invalidate];
-        [m_verticalScrollbarPainterDelegate.get() invalidate];
-        [m_scrollAnimationHelperDelegate.get() invalidate];
-        END_BLOCK_OBJC_EXCEPTIONS;
-    }
+    BEGIN_BLOCK_OBJC_EXCEPTIONS;
+    [m_scrollbarPainterControllerDelegate invalidate];
+    [m_scrollbarPainterController setDelegate:nil];
+    [m_horizontalScrollbarPainterDelegate invalidate];
+    [m_verticalScrollbarPainterDelegate invalidate];
+    [m_scrollAnimationHelperDelegate invalidate];
+    END_BLOCK_OBJC_EXCEPTIONS;
 }
 
 static bool scrollAnimationEnabledForSystem()
 {
-    NSString* scrollAnimationDefaultsKey = 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED <= 1070
-        @"AppleScrollAnimationEnabled";
-#else
-        @"NSScrollAnimationEnabled";
-#endif
+    NSString* scrollAnimationDefaultsKey = @"NSScrollAnimationEnabled";
     static bool enabled = [[NSUserDefaults standardUserDefaults] boolForKey:scrollAnimationDefaultsKey];
     return enabled;
 }
@@ -676,43 +694,55 @@ bool ScrollAnimatorMac::scroll(ScrollbarOrientation orientation, ScrollGranulari
 {
     m_haveScrolledSincePageLoad = true;
 
-    if (!scrollAnimationEnabledForSystem() || !m_scrollableArea->scrollAnimatorEnabled())
+    if (!scrollAnimationEnabledForSystem() || !m_scrollableArea.scrollAnimatorEnabled())
         return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
 
     if (granularity == ScrollByPixel)
         return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
 
     float currentPos = orientation == HorizontalScrollbar ? m_currentPosX : m_currentPosY;
-    float newPos = std::max<float>(std::min<float>(currentPos + (step * multiplier), static_cast<float>(m_scrollableArea->scrollSize(orientation))), 0);
+    float newPos = std::max<float>(std::min<float>(currentPos + (step * multiplier), static_cast<float>(m_scrollableArea.scrollSize(orientation))), 0);
     if (currentPos == newPos)
         return false;
 
     NSPoint newPoint;
-    if ([m_scrollAnimationHelper.get() _isAnimating]) {
-        NSPoint targetOrigin = [m_scrollAnimationHelper.get() targetOrigin];
+    if ([m_scrollAnimationHelper _isAnimating]) {
+        NSPoint targetOrigin = [m_scrollAnimationHelper targetOrigin];
         newPoint = orientation == HorizontalScrollbar ? NSMakePoint(newPos, targetOrigin.y) : NSMakePoint(targetOrigin.x, newPos);
     } else
         newPoint = orientation == HorizontalScrollbar ? NSMakePoint(newPos, m_currentPosY) : NSMakePoint(m_currentPosX, newPos);
 
-    [m_scrollAnimationHelper.get() scrollToPoint:newPoint];
+    [m_scrollAnimationHelper scrollToPoint:newPoint];
     return true;
 }
 
 void ScrollAnimatorMac::scrollToOffsetWithoutAnimation(const FloatPoint& offset)
 {
-    [m_scrollAnimationHelper.get() _stopRun];
+    [m_scrollAnimationHelper _stopRun];
     immediateScrollTo(offset);
 }
 
 FloatPoint ScrollAnimatorMac::adjustScrollPositionIfNecessary(const FloatPoint& position) const
 {
-    if (!m_scrollableArea->constrainsScrollingToContentEdge())
+    if (!m_scrollableArea.constrainsScrollingToContentEdge())
         return position;
 
-    float newX = max<float>(min<float>(position.x(), m_scrollableArea->totalContentsSize().width() - m_scrollableArea->visibleWidth()), 0);
-    float newY = max<float>(min<float>(position.y(), m_scrollableArea->totalContentsSize().height() - m_scrollableArea->visibleHeight()), 0);
+    float newX = std::max<float>(std::min<float>(position.x(), m_scrollableArea.totalContentsSize().width() - m_scrollableArea.visibleWidth()), 0);
+    float newY = std::max<float>(std::min<float>(position.y(), m_scrollableArea.totalContentsSize().height() - m_scrollableArea.visibleHeight()), 0);
 
     return FloatPoint(newX, newY);
+}
+
+void ScrollAnimatorMac::adjustScrollPositionToBoundsIfNecessary()
+{
+    bool currentlyConstrainsToContentEdge = m_scrollableArea.constrainsScrollingToContentEdge();
+    m_scrollableArea.setConstrainsScrollingToContentEdge(true);
+
+    IntPoint currentScrollPosition = absoluteScrollPosition();
+    FloatPoint nearestPointWithinBounds = adjustScrollPositionIfNecessary(absoluteScrollPosition());
+    immediateScrollBy(nearestPointWithinBounds - currentScrollPosition);
+
+    m_scrollableArea.setConstrainsScrollingToContentEdge(currentlyConstrainsToContentEdge);
 }
 
 void ScrollAnimatorMac::immediateScrollTo(const FloatPoint& newPosition)
@@ -720,7 +750,7 @@ void ScrollAnimatorMac::immediateScrollTo(const FloatPoint& newPosition)
     FloatPoint adjustedPosition = adjustScrollPositionIfNecessary(newPosition);
  
     bool positionChanged = adjustedPosition.x() != m_currentPosX || adjustedPosition.y() != m_currentPosY;
-    if (!positionChanged && !scrollableArea()->scrollOriginChanged())
+    if (!positionChanged && !scrollableArea().scrollOriginChanged())
         return;
 
     FloatSize delta = FloatSize(adjustedPosition.x() - m_currentPosX, adjustedPosition.y() - m_currentPosY);
@@ -728,6 +758,7 @@ void ScrollAnimatorMac::immediateScrollTo(const FloatPoint& newPosition)
     m_currentPosX = adjustedPosition.x();
     m_currentPosY = adjustedPosition.y();
     notifyPositionChanged(delta);
+    updateActiveScrollSnapIndexForOffset();
 }
 
 bool ScrollAnimatorMac::isRubberBandInProgress() const
@@ -735,7 +766,16 @@ bool ScrollAnimatorMac::isRubberBandInProgress() const
 #if !ENABLE(RUBBER_BANDING)
     return false;
 #else
-    return m_scrollElasticityController.isRubberBandInProgress();
+    return m_scrollController.isRubberBandInProgress();
+#endif
+}
+
+bool ScrollAnimatorMac::isScrollSnapInProgress() const
+{
+#if ENABLE(CSS_SCROLL_SNAP)
+    return m_scrollController.isScrollSnapInProgress();
+#else
+    return false;
 #endif
 }
 
@@ -753,34 +793,34 @@ void ScrollAnimatorMac::notifyPositionChanged(const FloatSize& delta)
 
 void ScrollAnimatorMac::contentAreaWillPaint() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() contentAreaWillDraw];
+
+    [m_scrollbarPainterController contentAreaWillDraw];
 }
 
 void ScrollAnimatorMac::mouseEnteredContentArea() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() mouseEnteredContentArea];
+
+    [m_scrollbarPainterController mouseEnteredContentArea];
 }
 
 void ScrollAnimatorMac::mouseExitedContentArea() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() mouseExitedContentArea];
+
+    [m_scrollbarPainterController mouseExitedContentArea];
 }
 
 void ScrollAnimatorMac::mouseMovedInContentArea() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() mouseMovedInContentArea];
+
+    [m_scrollbarPainterController mouseMovedInContentArea];
 }
 
 void ScrollAnimatorMac::mouseEnteredScrollbar(Scrollbar* scrollbar) const
@@ -789,15 +829,13 @@ void ScrollAnimatorMac::mouseEnteredScrollbar(Scrollbar* scrollbar) const
     if (recommendedScrollerStyle() != NSScrollerStyleLegacy)
         return;
 
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
 
-    if (isScrollbarOverlayAPIAvailable()) {
-        if (!supportsUIStateTransitionProgress())
-            return;
-        if (ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar))
-            [painter mouseEnteredScroller];
-    }
+    if (!supportsUIStateTransitionProgress())
+        return;
+    if (ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar))
+        [painter mouseEnteredScroller];
 }
 
 void ScrollAnimatorMac::mouseExitedScrollbar(Scrollbar* scrollbar) const
@@ -806,160 +844,225 @@ void ScrollAnimatorMac::mouseExitedScrollbar(Scrollbar* scrollbar) const
     if (recommendedScrollerStyle() != NSScrollerStyleLegacy)
         return;
 
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
 
-    if (isScrollbarOverlayAPIAvailable()) {
-        if (!supportsUIStateTransitionProgress())
-            return;
-        if (ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar))
-            [painter mouseExitedScroller];
+    if (!supportsUIStateTransitionProgress())
+        return;
+    if (ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar))
+        [painter mouseExitedScroller];
+}
+
+void ScrollAnimatorMac::mouseIsDownInScrollbar(Scrollbar* scrollbar, bool mouseIsDown) const
+{
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
+        return;
+
+    if (ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar)) {
+        [painter setTracking:mouseIsDown];
+        if (mouseIsDown)
+            [m_scrollbarPainterController beginScrollGesture];
+        else
+            [m_scrollbarPainterController endScrollGesture];
     }
 }
 
 void ScrollAnimatorMac::willStartLiveResize()
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() startLiveResize];
+
+    [m_scrollbarPainterController startLiveResize];
 }
 
 void ScrollAnimatorMac::contentsResized() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() contentAreaDidResize];
+
+    [m_scrollbarPainterController contentAreaDidResize];
 }
 
 void ScrollAnimatorMac::willEndLiveResize()
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() endLiveResize];
+
+    [m_scrollbarPainterController endLiveResize];
 }
 
 void ScrollAnimatorMac::contentAreaDidShow() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() windowOrderedIn];
+
+    [m_scrollbarPainterController windowOrderedIn];
 }
 
 void ScrollAnimatorMac::contentAreaDidHide() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() windowOrderedOut];
+
+    [m_scrollbarPainterController windowOrderedOut];
 }
 
 void ScrollAnimatorMac::didBeginScrollGesture() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() beginScrollGesture];
+
+    [m_scrollbarPainterController beginScrollGesture];
+
+#if ENABLE(CSS_SCROLL_SNAP) || ENABLE(RUBBER_BANDING)
+    if (m_wheelEventTestTrigger)
+        m_wheelEventTestTrigger->deferTestsForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(this), WheelEventTestTrigger::ContentScrollInProgress);
+#endif
 }
 
 void ScrollAnimatorMac::didEndScrollGesture() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() endScrollGesture];
+
+    [m_scrollbarPainterController endScrollGesture];
+
+#if ENABLE(CSS_SCROLL_SNAP) || ENABLE(RUBBER_BANDING)
+    if (m_wheelEventTestTrigger)
+        m_wheelEventTestTrigger->removeTestDeferralForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(this), WheelEventTestTrigger::ContentScrollInProgress);
+#endif
 }
 
 void ScrollAnimatorMac::mayBeginScrollGesture() const
 {
-    if (!scrollableArea()->scrollbarsCanBeActive())
-        return;
-    if (!isScrollbarOverlayAPIAvailable())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
 
-    [m_scrollbarPainterController.get() beginScrollGesture];
-    [m_scrollbarPainterController.get() contentAreaScrolled];
+    [m_scrollbarPainterController beginScrollGesture];
+    [m_scrollbarPainterController contentAreaScrolled];
 }
 
-void ScrollAnimatorMac::finishCurrentScrollAnimations()
+void ScrollAnimatorMac::lockOverlayScrollbarStateToHidden(bool shouldLockState)
 {
-    cancelAnimations();
+    if (shouldLockState)
+        [m_scrollbarPainterController lockOverlayScrollerState:ScrollbarOverlayStateHidden];
+    else {
+        [m_scrollbarPainterController unlockOverlayScrollerState];
 
-    if (isScrollbarOverlayAPIAvailable())
-        [m_scrollbarPainterController.get() hideOverlayScrollers];
+        // We never update scroller style for PainterControllers that are locked. If we have a pending
+        // need to update the style, do it once we've unlocked the scroller state.
+        if (m_needsScrollerStyleUpdate)
+            updateScrollerStyle();
+    }
+}
+
+bool ScrollAnimatorMac::scrollbarsCanBeActive() const
+{
+    return ![m_scrollbarPainterController overlayScrollerStateIsLocked];
 }
 
 void ScrollAnimatorMac::didAddVerticalScrollbar(Scrollbar* scrollbar)
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar);
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
     if (!painter)
         return;
 
     ASSERT(!m_verticalScrollbarPainterDelegate);
     m_verticalScrollbarPainterDelegate = adoptNS([[WebScrollbarPainterDelegate alloc] initWithScrollbar:scrollbar]);
 
-    [painter setDelegate:m_verticalScrollbarPainterDelegate.get()];
-    [m_scrollbarPainterController.get() setVerticalScrollerImp:painter];
-    if (scrollableArea()->inLiveResize())
+    [painter setDelegate:(id)m_verticalScrollbarPainterDelegate.get()];
+    if (GraphicsLayer* layer = scrollbar->scrollableArea().layerForVerticalScrollbar())
+        [painter setLayer:layer->platformLayer()];
+
+    [m_scrollbarPainterController setVerticalScrollerImp:painter];
+    if (scrollableArea().inLiveResize())
         [painter setKnobAlpha:1];
 }
 
 void ScrollAnimatorMac::willRemoveVerticalScrollbar(Scrollbar* scrollbar)
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar);
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
     if (!painter)
         return;
 
     ASSERT(m_verticalScrollbarPainterDelegate);
-    [m_verticalScrollbarPainterDelegate.get() invalidate];
+    [m_verticalScrollbarPainterDelegate invalidate];
     m_verticalScrollbarPainterDelegate = nullptr;
 
     [painter setDelegate:nil];
-    [m_scrollbarPainterController.get() setVerticalScrollerImp:nil];
+    [m_scrollbarPainterController setVerticalScrollerImp:nil];
 }
 
 void ScrollAnimatorMac::didAddHorizontalScrollbar(Scrollbar* scrollbar)
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar);
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
     if (!painter)
         return;
 
     ASSERT(!m_horizontalScrollbarPainterDelegate);
     m_horizontalScrollbarPainterDelegate = adoptNS([[WebScrollbarPainterDelegate alloc] initWithScrollbar:scrollbar]);
 
-    [painter setDelegate:m_horizontalScrollbarPainterDelegate.get()];
-    [m_scrollbarPainterController.get() setHorizontalScrollerImp:painter];
-    if (scrollableArea()->inLiveResize())
+    [painter setDelegate:(id)m_horizontalScrollbarPainterDelegate.get()];
+    if (GraphicsLayer* layer = scrollbar->scrollableArea().layerForHorizontalScrollbar())
+        [painter setLayer:layer->platformLayer()];
+
+    [m_scrollbarPainterController setHorizontalScrollerImp:painter];
+    if (scrollableArea().inLiveResize())
         [painter setKnobAlpha:1];
 }
 
 void ScrollAnimatorMac::willRemoveHorizontalScrollbar(Scrollbar* scrollbar)
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar);
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
     if (!painter)
         return;
 
     ASSERT(m_horizontalScrollbarPainterDelegate);
-    [m_horizontalScrollbarPainterDelegate.get() invalidate];
+    [m_horizontalScrollbarPainterDelegate invalidate];
     m_horizontalScrollbarPainterDelegate = nullptr;
 
     [painter setDelegate:nil];
-    [m_scrollbarPainterController.get() setHorizontalScrollerImp:nil];
+    [m_scrollbarPainterController setHorizontalScrollerImp:nil];
+}
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+void ScrollAnimatorMac::invalidateScrollbarPartLayers(Scrollbar* scrollbar)
+{
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
+    [painter setNeedsDisplay:YES];
+}
+#else
+void ScrollAnimatorMac::invalidateScrollbarPartLayers(Scrollbar*)
+{
+}
+#endif
+
+void ScrollAnimatorMac::verticalScrollbarLayerDidChange()
+{
+    GraphicsLayer* layer = m_scrollableArea.layerForVerticalScrollbar();
+    Scrollbar* scrollbar = m_scrollableArea.verticalScrollbar();
+    if (!scrollbar)
+        return;
+
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
+    if (!painter)
+        return;
+
+    [painter setLayer:layer ? layer->platformLayer() : nil];
+}
+
+void ScrollAnimatorMac::horizontalScrollbarLayerDidChange()
+{
+    GraphicsLayer* layer = m_scrollableArea.layerForHorizontalScrollbar();
+    Scrollbar* scrollbar = m_scrollableArea.horizontalScrollbar();
+    if (!scrollbar)
+        return;
+
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
+    if (!painter)
+        return;
+
+    [painter setLayer:layer ? layer->platformLayer() : nil];
 }
 
 bool ScrollAnimatorMac::shouldScrollbarParticipateInHitTesting(Scrollbar* scrollbar)
@@ -968,14 +1071,11 @@ bool ScrollAnimatorMac::shouldScrollbarParticipateInHitTesting(Scrollbar* scroll
     if (recommendedScrollerStyle() != NSScrollerStyleOverlay)
         return true;
 
-    if (!isScrollbarOverlayAPIAvailable())
-        return true;
-
     if (scrollbar->isAlphaLocked())
         return true;
 
     // Overlay scrollbars should participate in hit testing whenever they are at all visible.
-    ScrollbarPainter painter = scrollbarPainterForScrollbar(scrollbar);
+    ScrollbarPainter painter = scrollbarPainterForScrollbar(*scrollbar);
     if (!painter)
         return false;
     return [painter knobAlpha] > 0;
@@ -983,16 +1083,13 @@ bool ScrollAnimatorMac::shouldScrollbarParticipateInHitTesting(Scrollbar* scroll
 
 void ScrollAnimatorMac::notifyContentAreaScrolled(const FloatSize& delta)
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    // This function is called when a page is going into the page cache, but the page 
+    // This function is called when a page is going into the page cache, but the page
     // isn't really scrolling in that case. We should only pass the message on to the
     // ScrollbarPainterController when we're really scrolling on an active page.
-    if (!scrollableArea()->scrollbarsCanBeActive())
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked])
         return;
 
-    if (m_scrollableArea->isHandlingWheelEvent())
+    if (m_scrollableArea.isHandlingWheelEvent())
         sendContentAreaScrolled(delta);
     else
         sendContentAreaScrolledSoon(delta);
@@ -1002,12 +1099,10 @@ void ScrollAnimatorMac::cancelAnimations()
 {
     m_haveScrolledSincePageLoad = false;
 
-    if (isScrollbarOverlayAPIAvailable()) {
-        if (scrollbarPaintTimerIsActive())
-            stopScrollbarPaintTimer();
-        [m_horizontalScrollbarPainterDelegate.get() cancelAnimations];
-        [m_verticalScrollbarPainterDelegate.get() cancelAnimations];
-    }
+    if (scrollbarPaintTimerIsActive())
+        stopScrollbarPaintTimer();
+    [m_horizontalScrollbarPainterDelegate cancelAnimations];
+    [m_verticalScrollbarPainterDelegate cancelAnimations];
 }
 
 void ScrollAnimatorMac::handleWheelEventPhase(PlatformWheelEventPhase phase)
@@ -1025,6 +1120,15 @@ void ScrollAnimatorMac::handleWheelEventPhase(PlatformWheelEventPhase phase)
 }
 
 #if ENABLE(RUBBER_BANDING)
+
+bool ScrollAnimatorMac::shouldForwardWheelEventsToParent(const PlatformWheelEvent& wheelEvent)
+{
+    if (std::abs(wheelEvent.deltaY()) >= std::abs(wheelEvent.deltaX()))
+        return !allowsVerticalStretching(wheelEvent);
+
+    return !allowsHorizontalStretching(wheelEvent);
+}
+    
 bool ScrollAnimatorMac::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
 {
     m_haveScrolledSincePageLoad = true;
@@ -1036,15 +1140,14 @@ bool ScrollAnimatorMac::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
     // up to the parent scrollable area. It takes advantage of the fact that
     // the base class implementation of handleWheelEvent will not accept the
     // wheel event if there is nowhere to scroll.
-    if (fabsf(wheelEvent.deltaY()) >= fabsf(wheelEvent.deltaX())) {
-        if (!allowsVerticalStretching())
-            return ScrollAnimator::handleWheelEvent(wheelEvent);
-    } else {
-        if (!allowsHorizontalStretching())
-            return ScrollAnimator::handleWheelEvent(wheelEvent);
+    if (shouldForwardWheelEventsToParent(wheelEvent)) {
+        bool didHandleEvent = ScrollAnimator::handleWheelEvent(wheelEvent);
+        if (didHandleEvent || (!wheelEvent.deltaX() && !wheelEvent.deltaY()))
+            handleWheelEventPhase(wheelEvent.phase());
+        return didHandleEvent;
     }
 
-    bool didHandleEvent = m_scrollElasticityController.handleWheelEvent(wheelEvent);
+    bool didHandleEvent = m_scrollController.handleWheelEvent(wheelEvent);
 
     if (didHandleEvent)
         handleWheelEventPhase(wheelEvent.phase());
@@ -1052,39 +1155,78 @@ bool ScrollAnimatorMac::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
     return didHandleEvent;
 }
 
-bool ScrollAnimatorMac::pinnedInDirection(float deltaX, float deltaY)
+bool ScrollAnimatorMac::pinnedInDirection(const FloatSize& direction)
 {
     FloatSize limitDelta;
-    if (fabsf(deltaY) >= fabsf(deltaX)) {
-        if (deltaY < 0) {
+    if (fabsf(direction.height()) >= fabsf(direction.width())) {
+        if (direction.height() < 0) {
             // We are trying to scroll up.  Make sure we are not pinned to the top
-            limitDelta.setHeight(m_scrollableArea->visibleContentRect().y() + m_scrollableArea->scrollOrigin().y());
+            limitDelta.setHeight(m_scrollableArea.visibleContentRect().y() + m_scrollableArea.scrollOrigin().y());
         } else {
             // We are trying to scroll down.  Make sure we are not pinned to the bottom
-            limitDelta.setHeight(m_scrollableArea->totalContentsSize().height() - (m_scrollableArea->visibleContentRect().maxY() + m_scrollableArea->scrollOrigin().y()));
+            limitDelta.setHeight(m_scrollableArea.totalContentsSize().height() - (m_scrollableArea.visibleContentRect().maxY() + m_scrollableArea.scrollOrigin().y()));
         }
-    } else if (deltaX != 0) {
-        if (deltaX < 0) {
+    } else if (direction.width()) {
+        if (direction.width() < 0) {
             // We are trying to scroll left.  Make sure we are not pinned to the left
-            limitDelta.setWidth(m_scrollableArea->visibleContentRect().x() + m_scrollableArea->scrollOrigin().x());
+            limitDelta.setWidth(m_scrollableArea.visibleContentRect().x() + m_scrollableArea.scrollOrigin().x());
         } else {
             // We are trying to scroll right.  Make sure we are not pinned to the right
-            limitDelta.setWidth(m_scrollableArea->totalContentsSize().width() - (m_scrollableArea->visibleContentRect().maxX() + m_scrollableArea->scrollOrigin().x()));
+            limitDelta.setWidth(m_scrollableArea.totalContentsSize().width() - (m_scrollableArea.visibleContentRect().maxX() + m_scrollableArea.scrollOrigin().x()));
         }
     }
     
-    if ((deltaX != 0 || deltaY != 0) && (limitDelta.width() < 1 && limitDelta.height() < 1))
+    if ((direction.width() || direction.height()) && (limitDelta.width() < 1 && limitDelta.height() < 1))
         return true;
     return false;
 }
 
-bool ScrollAnimatorMac::allowsVerticalStretching()
+// FIXME: We should find a way to share some of the code from newGestureIsStarting(), isAlreadyPinnedInDirectionOfGesture(),
+// allowsVerticalStretching(), and allowsHorizontalStretching() with the implementation in ScrollingTreeFrameScrollingNodeMac.
+static bool newGestureIsStarting(const PlatformWheelEvent& wheelEvent)
 {
-    switch (m_scrollableArea->verticalScrollElasticity()) {
+    return wheelEvent.phase() == PlatformWheelEventPhaseMayBegin || wheelEvent.phase() == PlatformWheelEventPhaseBegan;
+}
+
+bool ScrollAnimatorMac::isAlreadyPinnedInDirectionOfGesture(const PlatformWheelEvent& wheelEvent, ScrollEventAxis axis)
+{
+    switch (axis) {
+    case ScrollEventAxis::Vertical:
+        return (wheelEvent.deltaY() > 0 && m_scrollableArea.scrolledToTop()) || (wheelEvent.deltaY() < 0 && m_scrollableArea.scrolledToBottom());
+    case ScrollEventAxis::Horizontal:
+        return (wheelEvent.deltaX() > 0 && m_scrollableArea.scrolledToLeft()) || (wheelEvent.deltaX() < 0 && m_scrollableArea.scrolledToRight());
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+#if ENABLE(CSS_SCROLL_SNAP)
+static bool gestureShouldBeginSnap(const PlatformWheelEvent& wheelEvent, const Vector<LayoutUnit>* snapOffsets)
+{
+    if (!snapOffsets)
+        return false;
+    
+    if (wheelEvent.phase() != PlatformWheelEventPhaseEnded && !wheelEvent.isEndGesture())
+        return false;
+
+    return true;
+}
+#endif
+
+bool ScrollAnimatorMac::allowsVerticalStretching(const PlatformWheelEvent& wheelEvent)
+{
+    switch (m_scrollableArea.verticalScrollElasticity()) {
     case ScrollElasticityAutomatic: {
-        Scrollbar* hScroller = m_scrollableArea->horizontalScrollbar();
-        Scrollbar* vScroller = m_scrollableArea->verticalScrollbar();
-        return (((vScroller && vScroller->enabled()) || (!hScroller || !hScroller->enabled())));
+        Scrollbar* hScroller = m_scrollableArea.horizontalScrollbar();
+        Scrollbar* vScroller = m_scrollableArea.verticalScrollbar();
+        bool scrollbarsAllowStretching = ((vScroller && vScroller->enabled()) || (!hScroller || !hScroller->enabled()));
+        bool eventPreventsStretching = m_scrollableArea.hasScrollableOrRubberbandableAncestor() && newGestureIsStarting(wheelEvent) && isAlreadyPinnedInDirectionOfGesture(wheelEvent, ScrollEventAxis::Vertical);
+#if ENABLE(CSS_SCROLL_SNAP)
+        if (!eventPreventsStretching)
+            eventPreventsStretching = gestureShouldBeginSnap(wheelEvent, m_scrollableArea.verticalSnapOffsets());
+#endif
+        return scrollbarsAllowStretching && !eventPreventsStretching;
     }
     case ScrollElasticityNone:
         return false;
@@ -1096,13 +1238,19 @@ bool ScrollAnimatorMac::allowsVerticalStretching()
     return false;
 }
 
-bool ScrollAnimatorMac::allowsHorizontalStretching()
+bool ScrollAnimatorMac::allowsHorizontalStretching(const PlatformWheelEvent& wheelEvent)
 {
-    switch (m_scrollableArea->horizontalScrollElasticity()) {
+    switch (m_scrollableArea.horizontalScrollElasticity()) {
     case ScrollElasticityAutomatic: {
-        Scrollbar* hScroller = m_scrollableArea->horizontalScrollbar();
-        Scrollbar* vScroller = m_scrollableArea->verticalScrollbar();
-        return (((hScroller && hScroller->enabled()) || (!vScroller || !vScroller->enabled())));
+        Scrollbar* hScroller = m_scrollableArea.horizontalScrollbar();
+        Scrollbar* vScroller = m_scrollableArea.verticalScrollbar();
+        bool scrollbarsAllowStretching = ((hScroller && hScroller->enabled()) || (!vScroller || !vScroller->enabled()));
+        bool eventPreventsStretching = m_scrollableArea.hasScrollableOrRubberbandableAncestor() && newGestureIsStarting(wheelEvent) && isAlreadyPinnedInDirectionOfGesture(wheelEvent, ScrollEventAxis::Horizontal);
+#if ENABLE(CSS_SCROLL_SNAP)
+        if (!eventPreventsStretching)
+            eventPreventsStretching = gestureShouldBeginSnap(wheelEvent, m_scrollableArea.horizontalSnapOffsets());
+#endif
+        return scrollbarsAllowStretching && !eventPreventsStretching;
     }
     case ScrollElasticityNone:
         return false;
@@ -1116,17 +1264,12 @@ bool ScrollAnimatorMac::allowsHorizontalStretching()
 
 IntSize ScrollAnimatorMac::stretchAmount()
 {
-    return m_scrollableArea->overhangAmount();
-}
-
-bool ScrollAnimatorMac::pinnedInDirection(const FloatSize& direction)
-{
-    return pinnedInDirection(direction.width(), direction.height());
+    return m_scrollableArea.overhangAmount();
 }
 
 bool ScrollAnimatorMac::canScrollHorizontally()
 {
-    Scrollbar* scrollbar = m_scrollableArea->horizontalScrollbar();
+    Scrollbar* scrollbar = m_scrollableArea.horizontalScrollbar();
     if (!scrollbar)
         return false;
     return scrollbar->enabled();
@@ -1134,27 +1277,27 @@ bool ScrollAnimatorMac::canScrollHorizontally()
 
 bool ScrollAnimatorMac::canScrollVertically()
 {
-    Scrollbar* scrollbar = m_scrollableArea->verticalScrollbar();
+    Scrollbar* scrollbar = m_scrollableArea.verticalScrollbar();
     if (!scrollbar)
         return false;
     return scrollbar->enabled();
 }
 
-bool ScrollAnimatorMac::shouldRubberBandInDirection(ScrollDirection direction)
+bool ScrollAnimatorMac::shouldRubberBandInDirection(ScrollDirection)
 {
-    return m_scrollableArea->shouldRubberBandInDirection(direction);
+    return false;
 }
 
 IntPoint ScrollAnimatorMac::absoluteScrollPosition()
 {
-    return m_scrollableArea->visibleContentRect().location() + m_scrollableArea->scrollOrigin();
+    return m_scrollableArea.visibleContentRect().location() + m_scrollableArea.scrollOrigin();
 }
 
 void ScrollAnimatorMac::immediateScrollByWithoutContentEdgeConstraints(const FloatSize& delta)
 {
-    m_scrollableArea->setConstrainsScrollingToContentEdge(false);
+    m_scrollableArea.setConstrainsScrollingToContentEdge(false);
     immediateScrollBy(delta);
-    m_scrollableArea->setConstrainsScrollingToContentEdge(true);
+    m_scrollableArea.setConstrainsScrollingToContentEdge(true);
 }
 
 void ScrollAnimatorMac::immediateScrollBy(const FloatSize& delta)
@@ -1168,41 +1311,13 @@ void ScrollAnimatorMac::immediateScrollBy(const FloatSize& delta)
     m_currentPosX = newPos.x();
     m_currentPosY = newPos.y();
     notifyPositionChanged(adjustedDelta);
-}
-
-void ScrollAnimatorMac::startSnapRubberbandTimer()
-{
-    m_snapRubberBandTimer.startRepeating(1.0 / 60.0);
-}
-
-void ScrollAnimatorMac::stopSnapRubberbandTimer()
-{
-    m_snapRubberBandTimer.stop();
-}
-
-void ScrollAnimatorMac::snapRubberBandTimerFired(Timer<ScrollAnimatorMac>*)
-{
-    m_scrollElasticityController.snapRubberBandTimerFired();
+    updateActiveScrollSnapIndexForOffset();
 }
 #endif
 
-void ScrollAnimatorMac::setIsActive()
-{
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    if (!m_needsScrollerStyleUpdate)
-        return;
-
-    updateScrollerStyle();
-}
-
 void ScrollAnimatorMac::updateScrollerStyle()
 {
-    if (!isScrollbarOverlayAPIAvailable())
-        return;
-
-    if (!scrollableArea()->scrollbarsCanBeActive()) {
+    if ([m_scrollbarPainterController overlayScrollerStateIsLocked]) {
         m_needsScrollerStyleUpdate = true;
         return;
     }
@@ -1215,18 +1330,18 @@ void ScrollAnimatorMac::updateScrollerStyle()
     
     macTheme->usesOverlayScrollbarsChanged();
 
-    NSScrollerStyle newStyle = [m_scrollbarPainterController.get() scrollerStyle];
+    NSScrollerStyle newStyle = [m_scrollbarPainterController scrollerStyle];
 
-    if (Scrollbar* verticalScrollbar = scrollableArea()->verticalScrollbar()) {
+    if (Scrollbar* verticalScrollbar = scrollableArea().verticalScrollbar()) {
         verticalScrollbar->invalidate();
 
-        ScrollbarPainter oldVerticalPainter = [m_scrollbarPainterController.get() verticalScrollerImp];
+        ScrollbarPainter oldVerticalPainter = [m_scrollbarPainterController verticalScrollerImp];
         ScrollbarPainter newVerticalPainter = [NSClassFromString(@"NSScrollerImp") scrollerImpWithStyle:newStyle 
                                                                                     controlSize:(NSControlSize)verticalScrollbar->controlSize() 
                                                                                     horizontal:NO 
                                                                                     replacingScrollerImp:oldVerticalPainter];
-        [m_scrollbarPainterController.get() setVerticalScrollerImp:newVerticalPainter];
-        macTheme->setNewPainterForScrollbar(verticalScrollbar, newVerticalPainter);
+        [m_scrollbarPainterController setVerticalScrollerImp:newVerticalPainter];
+        macTheme->setNewPainterForScrollbar(*verticalScrollbar, newVerticalPainter);
 
         // The different scrollbar styles have different thicknesses, so we must re-set the 
         // frameRect to the new thickness, and the re-layout below will ensure the position
@@ -1235,16 +1350,16 @@ void ScrollAnimatorMac::updateScrollerStyle()
         verticalScrollbar->setFrameRect(IntRect(0, 0, thickness, thickness));
     }
 
-    if (Scrollbar* horizontalScrollbar = scrollableArea()->horizontalScrollbar()) {
+    if (Scrollbar* horizontalScrollbar = scrollableArea().horizontalScrollbar()) {
         horizontalScrollbar->invalidate();
 
-        ScrollbarPainter oldHorizontalPainter = [m_scrollbarPainterController.get() horizontalScrollerImp];
+        ScrollbarPainter oldHorizontalPainter = [m_scrollbarPainterController horizontalScrollerImp];
         ScrollbarPainter newHorizontalPainter = [NSClassFromString(@"NSScrollerImp") scrollerImpWithStyle:newStyle 
                                                                                     controlSize:(NSControlSize)horizontalScrollbar->controlSize() 
                                                                                     horizontal:YES 
                                                                                     replacingScrollerImp:oldHorizontalPainter];
-        [m_scrollbarPainterController.get() setHorizontalScrollerImp:newHorizontalPainter];
-        macTheme->setNewPainterForScrollbar(horizontalScrollbar, newHorizontalPainter);
+        [m_scrollbarPainterController setHorizontalScrollerImp:newHorizontalPainter];
+        macTheme->setNewPainterForScrollbar(*horizontalScrollbar, newHorizontalPainter);
 
         // The different scrollbar styles have different thicknesses, so we must re-set the 
         // frameRect to the new thickness, and the re-layout below will ensure the position
@@ -1255,7 +1370,7 @@ void ScrollAnimatorMac::updateScrollerStyle()
 
     // If m_needsScrollerStyleUpdate is true, then the page is restoring from the page cache, and 
     // a relayout will happen on its own. Otherwise, we must initiate a re-layout ourselves.
-    scrollableArea()->scrollbarStyleChanged(newStyle, !m_needsScrollerStyleUpdate);
+    scrollableArea().scrollbarStyleChanged(newStyle == NSScrollerStyleOverlay ? ScrollbarStyle::Overlay : ScrollbarStyle::AlwaysVisible, !m_needsScrollerStyleUpdate);
 
     m_needsScrollerStyleUpdate = false;
 }
@@ -1275,14 +1390,12 @@ void ScrollAnimatorMac::stopScrollbarPaintTimer()
     m_initialScrollbarPaintTimer.stop();
 }
 
-void ScrollAnimatorMac::initialScrollbarPaintTimerFired(Timer<ScrollAnimatorMac>*)
+void ScrollAnimatorMac::initialScrollbarPaintTimerFired()
 {
-    if (isScrollbarOverlayAPIAvailable()) {
-        // To force the scrollbars to flash, we have to call hide first. Otherwise, the ScrollbarPainterController
-        // might think that the scrollbars are already showing and bail early.
-        [m_scrollbarPainterController.get() hideOverlayScrollers];
-        [m_scrollbarPainterController.get() flashScrollers];
-    }
+    // To force the scrollbars to flash, we have to call hide first. Otherwise, the ScrollbarPainterController
+    // might think that the scrollbars are already showing and bail early.
+    [m_scrollbarPainterController hideOverlayScrollers];
+    [m_scrollbarPainterController flashScrollers];
 }
 
 void ScrollAnimatorMac::sendContentAreaScrolledSoon(const FloatSize& delta)
@@ -1291,32 +1404,38 @@ void ScrollAnimatorMac::sendContentAreaScrolledSoon(const FloatSize& delta)
 
     if (!m_sendContentAreaScrolledTimer.isActive())
         m_sendContentAreaScrolledTimer.startOneShot(0);
+
+    if (m_wheelEventTestTrigger)
+        m_wheelEventTestTrigger->deferTestsForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(this), WheelEventTestTrigger::ContentScrollInProgress);
 }
 
 void ScrollAnimatorMac::sendContentAreaScrolled(const FloatSize& delta)
 {
     if (supportsContentAreaScrolledInDirection())
-        [m_scrollbarPainterController.get() contentAreaScrolledInDirection:NSMakePoint(delta.width(), delta.height())];
+        [m_scrollbarPainterController contentAreaScrolledInDirection:NSMakePoint(delta.width(), delta.height())];
     else
-        [m_scrollbarPainterController.get() contentAreaScrolled];
+        [m_scrollbarPainterController contentAreaScrolled];
 }
 
-void ScrollAnimatorMac::sendContentAreaScrolledTimerFired(Timer<ScrollAnimatorMac>*)
+void ScrollAnimatorMac::sendContentAreaScrolledTimerFired()
 {
     sendContentAreaScrolled(m_contentAreaScrolledTimerScrollDelta);
     m_contentAreaScrolledTimerScrollDelta = FloatSize();
+
+    if (m_wheelEventTestTrigger)
+        m_wheelEventTestTrigger->removeTestDeferralForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(this), WheelEventTestTrigger::ContentScrollInProgress);
 }
 
 void ScrollAnimatorMac::setVisibleScrollerThumbRect(const IntRect& scrollerThumb)
 {
     IntRect rectInViewCoordinates = scrollerThumb;
-    if (Scrollbar* verticalScrollbar = m_scrollableArea->verticalScrollbar())
+    if (Scrollbar* verticalScrollbar = m_scrollableArea.verticalScrollbar())
         rectInViewCoordinates = verticalScrollbar->convertToContainingView(scrollerThumb);
 
     if (rectInViewCoordinates == m_visibleScrollerThumbRect)
         return;
 
-    m_scrollableArea->setVisibleScrollerThumbRect(rectInViewCoordinates);
+    m_scrollableArea.setVisibleScrollerThumbRect(rectInViewCoordinates);
     m_visibleScrollerThumbRect = rectInViewCoordinates;
 }
 

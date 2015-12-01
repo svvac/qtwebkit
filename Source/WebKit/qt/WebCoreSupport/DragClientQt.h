@@ -34,13 +34,14 @@ class ChromeClient;
 
 class DragClientQt : public DragClient {
 public:
-    DragClientQt(ChromeClient* chromeClient) : m_chromeClient(chromeClient) { };
-    virtual void willPerformDragDestinationAction(DragDestinationAction, DragData*);
-    virtual DragDestinationAction actionMaskForDrag(DragData*);
+    DragClientQt(ChromeClient* chromeClient) : m_chromeClient(chromeClient) { }
+
+    virtual void willPerformDragDestinationAction(DragDestinationAction, DragData&);
+    virtual DragDestinationAction actionMaskForDrag(DragData&);
     virtual void dragControllerDestroyed();
     virtual DragSourceAction dragSourceActionMaskForPoint(const IntPoint&);
-    virtual void willPerformDragSourceAction(DragSourceAction, const IntPoint&, Clipboard*);    
-    virtual void startDrag(DragImageRef, const IntPoint& dragImageOrigin, const IntPoint& eventPos, Clipboard*, Frame*, bool linkDrag = false);
+    virtual void willPerformDragSourceAction(DragSourceAction, const IntPoint&, DataTransfer&);
+    virtual void startDrag(DragImageRef, const IntPoint& dragImageOrigin, const IntPoint& eventPos, DataTransfer&, Frame&, bool linkDrag = false);
 private:
     ChromeClient* m_chromeClient;
 };

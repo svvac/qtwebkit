@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,7 +26,7 @@
 
 #import "config.h"
 
-#if ENABLE(SQL_DATABASE)
+#if ENABLE(SPEECH_SYNTHESIS)
 
 #import "DOMInternal.h"
 
@@ -34,27 +34,21 @@
 
 #import "Class5.h"
 #import "Class6.h"
-#import "DOMBlobInternal.h"
-#import "DOMCSSRuleInternal.h"
-#import "DOMCSSValueInternal.h"
 #import "DOMClass5Internal.h"
 #import "DOMClass6Internal.h"
 #import "DOMDOMStringListInternal.h"
-#import "DOMEventInternal.h"
 #import "DOMFloat32ArrayInternal.h"
 #import "DOMNodeInternal.h"
 #import "DOMStringList.h"
-#import "DOMStyleSheetInternal.h"
 #import "DOMTestCallbackInternal.h"
 #import "DOMTestNodeInternal.h"
 #import "ExceptionHandlers.h"
-#import "Float32Array.h"
 #import "JSMainThreadExecState.h"
-#import "KURL.h"
 #import "SerializedScriptValue.h"
 #import "TestCallback.h"
 #import "TestNode.h"
 #import "ThreadCheck.h"
+#import "URL.h"
 #import "WebCoreObjCExtras.h"
 #import "WebScriptObjectPrivate.h"
 #import <wtf/GetPtr.h>
@@ -137,7 +131,7 @@ WebCore::TestCallback* core(DOMTestCallback *wrapper)
 
 DOMTestCallback *kit(WebCore::TestCallback* value)
 {
-    { DOM_ASSERT_MAIN_THREAD(); WebCoreThreadViolationCheckRoundOne(); };
+    WebCoreThreadViolationCheckRoundOne();
     if (!value)
         return nil;
     if (DOMTestCallback *wrapper = getDOMWrapper(value))
@@ -149,4 +143,4 @@ DOMTestCallback *kit(WebCore::TestCallback* value)
     return [wrapper autorelease];
 }
 
-#endif // ENABLE(SQL_DATABASE)
+#endif // ENABLE(SPEECH_SYNTHESIS)

@@ -23,13 +23,20 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if !PLATFORM(IOS)
+
 #ifndef WebCoreFullScreenPlaceholderView_h
 #define WebCoreFullScreenPlaceholderView_h
 
 #import <wtf/RetainPtr.h>
 
-@interface WebCoreFullScreenPlaceholderView : NSView {
+WEBCORE_EXPORT @interface WebCoreFullScreenPlaceholderView : NSView {
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+    RetainPtr<NSVisualEffectView> _effectView;
+    RetainPtr<NSTextField> _exitWarning;
+#else
     RetainPtr<NSView> _exitWarning;
+#endif
     NSObject* _target;
     SEL _action;
 }
@@ -40,3 +47,5 @@
 @end
 
 #endif // WebCoreFullScreenPlaceholderView_h
+
+#endif // !PLATFORM(IOS)

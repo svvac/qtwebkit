@@ -1457,7 +1457,7 @@ msgstr "Enable Caret Browsing"
 #: ../../../WebKit2/UIProcess/API/gtk/WebKitSettings.cpp:842
 #, fuzzy
 msgid "Whether to enable accessibility enhanced keyboard navigation"
-msgstr "Whether to enable accesibility enhanced keyboard navigation"
+msgstr "Whether to enable accessibility enhanced keyboard navigation"
 
 #: ../../../WebKit/gtk/webkit/webkitwebsettings.cpp:458
 msgid "Enable HTML5 Database"
@@ -1722,16 +1722,6 @@ msgstr ""
 #: ../../../WebKit2/UIProcess/API/gtk/WebKitSettings.cpp:986
 msgid "Whether media playback allows inline"
 msgstr ""
-
-#: ../../../WebKit/gtk/webkit/webkitwebsettings.cpp:991
-#, fuzzy
-msgid "Enable CSS shaders"
-msgstr "Enable XSS Auditor"
-
-#: ../../../WebKit/gtk/webkit/webkitwebsettings.cpp:992
-#, fuzzy
-msgid "Whether to enable css shaders"
-msgstr "Whether to enable DOM paste"
 
 #: ../../../WebKit/gtk/webkit/webkitwebsettings.cpp:1007
 msgid "Enable display of insecure content"

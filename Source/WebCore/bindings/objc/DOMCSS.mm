@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -33,6 +33,8 @@
 #import "DOMCSSCharsetRule.h"
 #import "DOMCSSFontFaceRule.h"
 #import "DOMCSSImportRule.h"
+#import "DOMCSSKeyframeRule.h"
+#import "DOMCSSKeyframesRule.h"
 #import "DOMCSSMediaRule.h"
 #import "DOMCSSPageRule.h"
 #import "DOMCSSPrimitiveValue.h"
@@ -40,25 +42,14 @@
 #import "DOMCSSStyleDeclaration.h"
 #import "DOMCSSStyleRule.h"
 #import "DOMCSSStyleSheet.h"
-#if ENABLE(CSS3_CONDITIONAL_RULES)
 #import "DOMCSSSupportsRule.h"
-#endif
 #import "DOMCSSUnknownRule.h"
 #import "DOMCSSValueInternal.h"
 #import "DOMCSSValueList.h"
 #import "DOMInternal.h"
 #import "DOMStyleSheetInternal.h"
-#import "DOMWebKitCSSKeyframeRule.h"
-#import "DOMWebKitCSSKeyframesRule.h"
-#import "DOMWebKitCSSTransformValue.h"
-
-#if ENABLE(CSS_SHADERS)
-#import "DOMWebKitCSSFilterRule.h"
-#endif
-
-#if ENABLE(CSS_FILTERS)
 #import "DOMWebKitCSSFilterValue.h"
-#endif
+#import "DOMWebKitCSSTransformValue.h"
 
 #if ENABLE(CSS_REGIONS)
 #import "DOMWebKitCSSRegionRule.h"
@@ -66,10 +57,6 @@
 
 #if ENABLE(CSS_DEVICE_ADAPTATION)
 #import "DOMWebKitCSSViewportRule.h"
-#endif
-
-#if ENABLE(SHADOW_DOM)
-#import "DOMCSSHostRule.h"
 #endif
 
 //------------------------------------------------------------------------------------------
@@ -102,14 +89,12 @@ Class kitClass(WebCore::CSSRule* impl)
             return [DOMCSSFontFaceRule class];
         case DOM_PAGE_RULE:
             return [DOMCSSPageRule class];
-        case DOM_WEBKIT_KEYFRAMES_RULE:
-            return [DOMWebKitCSSKeyframesRule class];
-        case DOM_WEBKIT_KEYFRAME_RULE:
-            return [DOMWebKitCSSKeyframeRule class];
-#if ENABLE(CSS3_CONDITIONAL_RULES)
+        case DOM_KEYFRAMES_RULE:
+            return [DOMCSSKeyframesRule class];
+        case DOM_KEYFRAME_RULE:
+            return [DOMCSSKeyframeRule class];
         case DOM_SUPPORTS_RULE:
             return [DOMCSSSupportsRule class];
-#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
         case DOM_WEBKIT_VIEWPORT_RULE:
             return [DOMWebKitCSSViewportRule class];
@@ -117,14 +102,6 @@ Class kitClass(WebCore::CSSRule* impl)
 #if ENABLE(CSS_REGIONS)
         case DOM_WEBKIT_REGION_RULE:
             return [DOMWebKitCSSRegionRule class];
-#endif
-#if ENABLE(SHADOW_DOM)
-        case DOM_HOST_RULE:
-            return [DOMCSSHostRule class];
-#endif
-#if ENABLE(CSS_SHADERS)
-        case DOM_WEBKIT_FILTER_RULE:
-            return [DOMWebKitCSSFilterRule class];
 #endif
     }
     ASSERT_NOT_REACHED();
@@ -142,13 +119,13 @@ Class kitClass(WebCore::CSSValue* impl)
         case WebCore::CSSValue::CSS_VALUE_LIST:
             if (impl->isWebKitCSSTransformValue())
                 return [DOMWebKitCSSTransformValue class];
-#if ENABLE(CSS_FILTERS)
             if (impl->isWebKitCSSFilterValue())
                 return [DOMWebKitCSSFilterValue class];
-#endif
             return [DOMCSSValueList class];
         case WebCore::CSSValue::CSS_INHERIT:
         case WebCore::CSSValue::CSS_INITIAL:
+        case WebCore::CSSValue::CSS_UNSET:
+        case WebCore::CSSValue::CSS_REVERT:
             return [DOMCSSValue class];
         case WebCore::CSSValue::CSS_CUSTOM:
             return [DOMCSSValue class];

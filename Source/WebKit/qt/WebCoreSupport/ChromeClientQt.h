@@ -31,10 +31,10 @@
 
 #include "ChromeClient.h"
 #include "FloatRect.h"
-#include "KURL.h"
+#include "URL.h"
 #include "QtPlatformPlugin.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
 QT_BEGIN_NAMESPACE
@@ -77,7 +77,7 @@ public:
     virtual bool canTakeFocus(FocusDirection);
     virtual void takeFocus(FocusDirection);
 
-    virtual void focusedNodeChanged(Node*);
+    virtual void focusedElementChanged(Element*);
     virtual void focusedFrameChanged(Frame*);
 
     virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&);
@@ -100,7 +100,7 @@ public:
 
     virtual void setResizable(bool);
 
-    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID, const String& stack);
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID);
 
     virtual bool canRunBeforeUnloadConfirmPanel();
     virtual bool runBeforeUnloadConfirmPanel(const String& message, Frame*);
@@ -117,6 +117,10 @@ public:
     virtual KeyboardUIMode keyboardUIMode();
     virtual IntRect windowResizerRect() const;
 
+
+    virtual void invalidateRootView(const IntRect&);
+    virtual void invalidateContentsAndRootView(const IntRect&);
+    virtual void invalidateContentsForSlowScroll(const IntRect&);
     virtual void invalidateRootView(const IntRect&, bool);
     virtual void invalidateContentsAndRootView(const IntRect&, bool);
     virtual void invalidateContentsForSlowScroll(const IntRect&, bool);
@@ -168,7 +172,7 @@ public:
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&);
+    virtual std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&);
 #endif
 
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
@@ -189,11 +193,11 @@ public:
     virtual bool selectItemWritingDirectionIsNatural();
     virtual bool selectItemAlignmentFollowsMenuWritingDirection();
     virtual bool hasOpenedPopup() const;
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
-    virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
+    virtual RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
+    virtual RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
     virtual void populateVisitedLinks();
 
-    PassOwnPtr<QWebSelectMethod> createSelectPopup() const;
+    std::unique_ptr<QWebSelectMethod> createSelectPopup() const;
 
     virtual void dispatchViewportPropertiesDidChange(const ViewportArguments&) const;
 
@@ -203,7 +207,7 @@ public:
     QWebFullScreenVideoHandler* createFullScreenVideoHandler();
 
     QWebPageAdapter* m_webPage;
-    KURL lastHoverURL;
+    URL lastHoverURL;
     String lastHoverTitle;
     String lastHoverContent;
 
@@ -212,8 +216,20 @@ public:
     bool menuBarVisible;
     QEventLoop* m_eventLoop;
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
-    OwnPtr<RefreshAnimation> m_refreshAnimation;
+    std::unique_ptr<RefreshAnimation> m_refreshAnimation;
 #endif
+
+    // Pass 0 as the GraphicsLayer to detatch the root layer.
+    virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
+    virtual void attachViewOverlayGraphicsLayer(Frame*, GraphicsLayer*);
+    // Sets a flag to specify that the next time content is drawn to the window,
+    // the changes appear on the screen in synchrony with updates to GraphicsLayers.
+    virtual void setNeedsOneShotDrawingSynchronization();
+    // Sets a flag to specify that the view needs to be updated, so we need
+    // to do an eager layout before the drawing.
+    virtual void scheduleCompositingLayerFlush();
+
+    virtual void wheelEventHandlersChanged(bool hasHandlers);
 
 #if ENABLE(VIDEO) && (USE(GSTREAMER) || USE(QT_MULTIMEDIA))
     FullScreenVideoQt* m_fullScreenVideo;
@@ -224,7 +240,7 @@ public:
     mutable QtPlatformPlugin m_platformPlugin;
 
 #if USE(ACCELERATED_COMPOSITING)
-    OwnPtr<TextureMapperLayerClientQt> m_textureMapperLayerClient;
+    std::unique_ptr<TextureMapperLayerClientQt> m_textureMapperLayerClient;
 #endif
 };
 }

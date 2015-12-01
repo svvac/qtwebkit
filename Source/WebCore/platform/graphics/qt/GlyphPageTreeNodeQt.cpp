@@ -21,32 +21,37 @@
     pages from the web. It has a memory cache for these objects.
 */
 #include "config.h"
-#include "GlyphPageTreeNode.h"
+#include "Font.h"
+#include "GlyphPage.h"
 
-#include "SimpleFontData.h"
 #include <QFontMetricsF>
 #include <QTextLayout>
 
 namespace WebCore {
 
-bool GlyphPage::fill(unsigned offset, unsigned length, UChar* buffer, unsigned bufferLength, const SimpleFontData* fontData)
+bool GlyphPage::fill(UChar *buffer, unsigned bufferLength, const Font* fontData)
 {
-    QRawFont rawFont = fontData->platformData().rawFont();
-    QString qstring = QString::fromRawData(reinterpret_cast<const QChar*>(buffer), static_cast<int>(bufferLength));
-    QVector<quint32> indexes = rawFont.glyphIndexesForString(qstring);
+  // bufferLength will be greater than the requested number of glyphs if the buffer contains surrogate pairs.
+  // We won't support this for now.
+  if (bufferLength > GlyphPage::size)
+      return false;
 
-    bool haveGlyphs = false;
+  QRawFont rawFont = fontData->platformData().rawFont();
+  QString qstring = QString::fromRawData(reinterpret_cast<const QChar*>(buffer), static_cast<int>(bufferLength));
+  QVector<quint32> indexes = rawFont.glyphIndexesForString(qstring);
 
-    for (unsigned i = 0; i < length; ++i) {
-        Glyph glyph = (i < indexes.size()) ? indexes.at(i) : 0;
-        if (!glyph)
-            setGlyphDataForIndex(offset + i, 0, 0);
-        else {
-            haveGlyphs = true;
-            setGlyphDataForIndex(offset + i, glyph, fontData);
-        }
-    }
-    return haveGlyphs;
+  bool haveGlyphs = false;
+
+  for (unsigned i = 0; i < GlyphPage::size; ++i) {
+      Glyph glyph = (i < indexes.size()) ? indexes.at(i) : 0;
+      if (!glyph)
+          setGlyphForIndex(i, 0);
+      else {
+          haveGlyphs = true;
+          setGlyphForIndex(i, glyph);
+      }
+  }
+  return haveGlyphs;
 }
 
 }

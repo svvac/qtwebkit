@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,19 +29,29 @@
 #import "DOMNodeInternal.h"
 #import "Frame.h"
 #import "JSNode.h"
+#import "NSPointerFunctionsSPI.h"
 #import "ScriptController.h"
 #import "WebScriptObjectPrivate.h"
 #import "runtime_root.h"
+#import <wtf/Lock.h>
+#import <wtf/NeverDestroyed.h>
+#import <wtf/spi/cocoa/NSMapTableSPI.h>
+
+#if PLATFORM(IOS)
+#define NEEDS_WRAPPER_CACHE_LOCK 1
+#endif
 
 //------------------------------------------------------------------------------------------
 // Wrapping WebCore implementation objects
 
 static NSMapTable* DOMWrapperCache;
+    
+#ifdef NEEDS_WRAPPER_CACHE_LOCK
+static StaticLock wrapperCacheLock;
+#endif
 
-#if COMPILER(CLANG)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif    
 
 NSMapTable* createWrapperCache()
 {
@@ -51,12 +61,13 @@ NSMapTable* createWrapperCache()
     return [[NSMapTable alloc] initWithKeyOptions:keyOptions valueOptions:valueOptions capacity:0];
 }
 
-#if COMPILER(CLANG)
 #pragma clang diagnostic pop
-#endif
 
 NSObject* getDOMWrapper(DOMObjectInternal* impl)
 {
+#ifdef NEEDS_WRAPPER_CACHE_LOCK
+    std::lock_guard<StaticLock> lock(wrapperCacheLock);
+#endif
     if (!DOMWrapperCache)
         return nil;
     return static_cast<NSObject*>(NSMapGet(DOMWrapperCache, impl));
@@ -64,6 +75,9 @@ NSObject* getDOMWrapper(DOMObjectInternal* impl)
 
 void addDOMWrapper(NSObject* wrapper, DOMObjectInternal* impl)
 {
+#ifdef NEEDS_WRAPPER_CACHE_LOCK
+    std::lock_guard<StaticLock> lock(wrapperCacheLock);
+#endif
     if (!DOMWrapperCache)
         DOMWrapperCache = createWrapperCache();
     NSMapInsert(DOMWrapperCache, impl, wrapper);
@@ -71,6 +85,9 @@ void addDOMWrapper(NSObject* wrapper, DOMObjectInternal* impl)
 
 void removeDOMWrapper(DOMObjectInternal* impl)
 {
+#ifdef NEEDS_WRAPPER_CACHE_LOCK
+    std::lock_guard<StaticLock> lock(wrapperCacheLock);
+#endif
     if (!DOMWrapperCache)
         return;
     NSMapRemove(DOMWrapperCache, impl);
@@ -112,20 +129,18 @@ void removeDOMWrapper(DOMObjectInternal* impl)
     WebCore::Node *nodeImpl = core(n);
 
     // Dig up Interpreter and ExecState.
-    WebCore::Frame *frame = 0;
-    if (WebCore::Document* document = nodeImpl->document())
-        frame = document->frame();
+    WebCore::Frame *frame = nodeImpl->document().frame();
     if (!frame)
         return;
 
     // The global object which should own this node - FIXME: does this need to be isolated-world aware?
-    WebCore::JSDOMGlobalObject* globalObject = frame->script()->globalObject(WebCore::mainThreadNormalWorld());
+    WebCore::JSDOMGlobalObject* globalObject = frame->script().globalObject(WebCore::mainThreadNormalWorld());
     JSC::ExecState *exec = globalObject->globalExec();
 
     // Get (or create) a cached JS object for the DOM node.
     JSC::JSObject *scriptImp = asObject(WebCore::toJS(exec, globalObject, nodeImpl));
 
-    JSC::Bindings::RootObject* rootObject = frame->script()->bindingRootObject();
+    JSC::Bindings::RootObject* rootObject = frame->script().bindingRootObject();
 
     [self _setImp:scriptImp originRootObject:rootObject rootObject:rootObject];
 }

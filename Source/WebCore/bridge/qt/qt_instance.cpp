@@ -50,11 +50,11 @@ class QtRuntimeObject : public RuntimeObject {
 public:
     typedef RuntimeObject Base;
 
-    static QtRuntimeObject* create(ExecState* exec, JSGlobalObject* globalObject, PassRefPtr<Instance> instance)
+    static QtRuntimeObject* create(VM& vm, Structure* structure, PassRefPtr<Instance> instance)
     {
-        Structure* domStructure = WebCore::deprecatedGetDOMStructure<QtRuntimeObject>(exec);
-        QtRuntimeObject* object = new (allocateCell<QtRuntimeObject>(*exec->heap())) QtRuntimeObject(exec, globalObject, domStructure, instance);
-        object->finishCreation(globalObject);
+        //Structure* domStructure = WebCore::deprecatedGetDOMStructure<QtRuntimeObject>(exec);
+        QtRuntimeObject* object = new (NotNull, allocateCell<QtRuntimeObject>(vm.heap)) QtRuntimeObject(vm, structure, instance);
+        object->finishCreation(vm);
         return object;
     }
     
@@ -66,16 +66,16 @@ public:
     }
 
 protected:
-    static const unsigned StructureFlags = RuntimeObject::StructureFlags | OverridesVisitChildren;
+    static const unsigned StructureFlags = RuntimeObject::StructureFlags;
 
 private:
-    QtRuntimeObject(ExecState*, JSGlobalObject*, Structure*, PassRefPtr<Instance>);
+    QtRuntimeObject(VM&, Structure*, PassRefPtr<Instance>);
 };
 
-const ClassInfo QtRuntimeObject::s_info = { "QtRuntimeObject", &RuntimeObject::s_info, 0, 0, CREATE_METHOD_TABLE(QtRuntimeObject) };
+const ClassInfo QtRuntimeObject::s_info = { "QtRuntimeObject", &RuntimeObject::s_info, 0, CREATE_METHOD_TABLE(QtRuntimeObject) };
 
-QtRuntimeObject::QtRuntimeObject(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, PassRefPtr<Instance> instance)
-    : RuntimeObject(exec, globalObject, structure, instance)
+QtRuntimeObject::QtRuntimeObject(VM& vm, Structure* structure, PassRefPtr<Instance> instance)
+    : RuntimeObject(vm, structure, instance)
 {
 }
 
@@ -172,7 +172,8 @@ RuntimeObject* QtInstance::newRuntimeObject(ExecState* exec)
     JSLockHolder lock(exec);
     qDeleteAll(m_methods);
     m_methods.clear();
-    return QtRuntimeObject::create(exec, exec->lexicalGlobalObject(), this);
+    Structure* structure = JSProxy::createStructure(exec->vm(), exec->lexicalGlobalObject(), jsNull());
+    return QtRuntimeObject::create(exec->vm(), structure, this);
 }
 
 void QtInstance::begin()
@@ -199,13 +200,13 @@ void QtInstance::getPropertyNames(ExecState* exec, PropertyNameArray& array)
         for (i = 0; i < meta->propertyCount(); i++) {
             QMetaProperty prop = meta->property(i);
             if (prop.isScriptable())
-                array.add(Identifier(exec, prop.name()));
+                array.add(Identifier::fromString(exec, prop.name()));
         }
 
 #ifndef QT_NO_PROPERTIES
         QList<QByteArray> dynProps = obj->dynamicPropertyNames();
         foreach (const QByteArray& ba, dynProps)
-            array.add(Identifier(exec, ba.constData()));
+            array.add(Identifier::fromString(exec, String(ba.constData(), ba.length())));
 #endif
 
         const int methodCount = meta->methodCount();
@@ -213,7 +214,7 @@ void QtInstance::getPropertyNames(ExecState* exec, PropertyNameArray& array)
             QMetaMethod method = meta->method(i);
             if (method.access() != QMetaMethod::Private) {
                 QByteArray sig = method.methodSignature();
-                array.add(Identifier(exec, String(sig.constData(), sig.length())));
+                array.add(Identifier::fromString(exec, String(sig.constData(), sig.length())));
             }
         }
     }
@@ -337,11 +338,11 @@ JSValue QtField::valueFromInstance(ExecState* exec, const Instance* inst) const
         JSValueRef exception = 0;
         JSValueRef jsValue = convertQVariantToValue(toRef(exec), inst->rootObject(), val, &exception);
         if (exception)
-            return throwError(exec, toJS(exec, exception));
+            return exec->vm().throwException(exec, createError(exec, ASCIILiteral("QT")));
         return toJS(exec, jsValue);
     }
     QString msg = QString(QLatin1String("cannot access member `%1' of deleted QObject")).arg(QLatin1String(name()));
-    return throwError(exec, createError(exec, msg.toLatin1().constData()));
+    return exec->vm().throwException(exec, createError(exec, msg.toLatin1().constData()));
 }
 
 void QtField::setValueToInstance(ExecState* exec, const Instance* inst, JSValue aValue) const
@@ -360,7 +361,7 @@ void QtField::setValueToInstance(ExecState* exec, const Instance* inst, JSValue 
         JSValueRef exception = 0;
         QVariant val = convertValueToQVariant(toRef(exec), toRef(exec, aValue), argtype, 0, &exception);
         if (exception) {
-            throwError(exec, toJS(exec, exception));
+            exec->vm().throwException(exec, createError(exec, ASCIILiteral("QT")));
             return;
         }
         if (m_type == MetaProperty) {
@@ -373,7 +374,7 @@ void QtField::setValueToInstance(ExecState* exec, const Instance* inst, JSValue 
 #endif
     } else {
         QString msg = QString(QLatin1String("cannot access member `%1' of deleted QObject")).arg(QLatin1String(name()));
-        throwError(exec, createError(exec, msg.toLatin1().constData()));
+        exec->vm().throwException(exec, createError(exec, msg.toLatin1().constData()));
     }
 }
 

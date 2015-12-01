@@ -25,9 +25,9 @@
 #include "ContextMenuItem.h"
 
 #include "ContextMenu.h"
-#include <wtf/gobject/GOwnPtr.h>
-#include <wtf/gobject/GRefPtr.h>
 #include <gtk/gtk.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 #define WEBKIT_CONTEXT_MENU_ACTION "webkit-context-menu"
@@ -124,7 +124,7 @@ static PlatformMenuItemDescription createPlatformMenuItemDescription(ContextMenu
     if (type == SeparatorType)
         return GTK_MENU_ITEM(gtk_separator_menu_item_new());
 
-    GOwnPtr<char> actionName(g_strdup_printf("context-menu-action-%d", action));
+    GUniquePtr<char> actionName(g_strdup_printf("context-menu-action-%d", action));
     GRefPtr<GtkAction> platformAction;
 
     if (type == CheckableActionType) {
@@ -138,6 +138,11 @@ static PlatformMenuItemDescription createPlatformMenuItemDescription(ContextMenu
     g_object_set_data(G_OBJECT(item), WEBKIT_CONTEXT_MENU_ACTION, GINT_TO_POINTER(action));
 
     return item;
+}
+
+ContextMenuItem::ContextMenuItem()
+    : m_platformDescription(nullptr)
+{
 }
 
 // Extract the ActionType from the menu item

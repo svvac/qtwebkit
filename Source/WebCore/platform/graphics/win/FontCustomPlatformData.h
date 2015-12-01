@@ -21,9 +21,7 @@
 #ifndef FontCustomPlatformData_h
 #define FontCustomPlatformData_h
 
-#include "FontOrientation.h"
-#include "FontRenderingMode.h"
-#include "FontWidthVariant.h"
+#include "TextFlags.h"
 #include <windows.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
@@ -33,6 +31,7 @@ typedef struct CGFont* CGFontRef;
 
 namespace WebCore {
 
+class FontDescription;
 class FontPlatformData;
 class SharedBuffer;
 
@@ -47,8 +46,7 @@ public:
 
     ~FontCustomPlatformData();
 
-    FontPlatformData fontPlatformData(int size, bool bold, bool italic, FontOrientation = Horizontal,
-                                      FontWidthVariant = RegularWidth, FontRenderingMode = NormalRenderingMode);
+    FontPlatformData fontPlatformData(const FontDescription&, bool bold, bool italic);
 
     static bool supportsFormat(const String&);
 
@@ -56,7 +54,7 @@ public:
     String m_name;
 };
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer*);
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer&);
 
 }
 

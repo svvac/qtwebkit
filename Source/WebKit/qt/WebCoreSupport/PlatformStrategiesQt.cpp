@@ -41,7 +41,6 @@
 #include <Page.h>
 #include <PageGroup.h>
 #include <PlatformCookieJar.h>
-#include <PluginDatabase.h>
 #include <QCoreApplication>
 #include <QLocale>
 #include <wtf/MathExtras.h>
@@ -50,8 +49,6 @@ using namespace WebCore;
 
 void PlatformStrategiesQt::initialize()
 {
-    DEFINE_STATIC_LOCAL(PlatformStrategiesQt, platformStrategies, ());
-    Q_UNUSED(platformStrategies);
 }
 
 PlatformStrategiesQt::PlatformStrategiesQt()
@@ -61,11 +58,6 @@ PlatformStrategiesQt::PlatformStrategiesQt()
 
 
 CookiesStrategy* PlatformStrategiesQt::createCookiesStrategy()
-{
-    return this;
-}
-
-DatabaseStrategy* PlatformStrategiesQt::createDatabaseStrategy()
 {
     return this;
 }
@@ -85,61 +77,48 @@ PluginStrategy* PlatformStrategiesQt::createPluginStrategy()
     return this;
 }
 
-SharedWorkerStrategy* PlatformStrategiesQt::createSharedWorkerStrategy()
-{
-    return this;
-}
-
-StorageStrategy* PlatformStrategiesQt::createStorageStrategy()
-{
-    return this;
-}
-
-VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
-{
-    return this;
-}
-
-String PlatformStrategiesQt::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesQt::cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookiesForDOM(session, firstParty, url);
 }
 
-void PlatformStrategiesQt::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
+void PlatformStrategiesQt::setCookiesFromDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url, const String& cookieString)
 {
     WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
 }
 
-bool PlatformStrategiesQt::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+bool PlatformStrategiesQt::cookiesEnabled(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookiesEnabled(session, firstParty, url);
 }
 
-String PlatformStrategiesQt::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesQt::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
 }
 
-bool PlatformStrategiesQt::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+bool PlatformStrategiesQt::getRawCookies(const NetworkStorageSession& session, const URL& firstParty, const URL& url, Vector<Cookie>& rawCookies)
 {
     return WebCore::getRawCookies(session, firstParty, url, rawCookies);
 }
 
-void PlatformStrategiesQt::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
+void PlatformStrategiesQt::deleteCookie(const NetworkStorageSession& session, const URL& url, const String& cookieName)
 {
     WebCore::deleteCookie(session, url, cookieName);
 }
 
 void PlatformStrategiesQt::refreshPlugins()
 {
-    PluginDatabase::installedPlugins()->refresh();
+
 }
 
 void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCore::PluginInfo>& outPlugins)
 {
+    notImplemented();
+    /*
     QWebPageAdapter* qPage = 0;
-    if (!page->chrome().client()->isEmptyChromeClient())
-        qPage = static_cast<ChromeClientQt*>(page->chrome().client())->m_webPage;
+    if (!page->chrome().client().isEmptyChromeClient())
+        qPage = static_cast<ChromeClientQt>(page->chrome().client()).m_webPage;
 
     QWebPluginFactory* factory;
     if (qPage && (factory = qPage->pluginFactory)) {
@@ -165,54 +144,5 @@ void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCo
             outPlugins.append(info);
         }
     }
-
-    PluginDatabase* db = PluginDatabase::installedPlugins();
-    const Vector<PluginPackage*> &plugins = db->plugins();
-
-    for (size_t i = 0; i < plugins.size(); ++i) {
-        PluginInfo info;
-        PluginPackage* package = plugins[i];
-
-        info.name = package->name();
-        info.file = package->fileName();
-        info.desc = package->description();
-
-        const MIMEToDescriptionsMap& mimeToDescriptions = package->mimeToDescriptions();
-        MIMEToDescriptionsMap::const_iterator end = mimeToDescriptions.end();
-        for (MIMEToDescriptionsMap::const_iterator it = mimeToDescriptions.begin(); it != end; ++it) {
-            MimeClassInfo mime;
-
-            mime.type = it->key;
-            mime.desc = it->value;
-            mime.extensions = package->mimeToExtensions().get(mime.type);
-
-            info.mimes.append(mime);
-        }
-
-        outPlugins.append(info);
-    }
-
-}
-
-// VisitedLinkStrategy
-
-bool PlatformStrategiesQt::isLinkVisited(Page* page, LinkHash hash, const KURL& baseURL, const AtomicString& attributeURL)
-{
-    ASSERT(hash);
-
-    Vector<UChar, 512> url;
-    visitedURL(baseURL, attributeURL, url);
-
-    // If the Qt4.4 interface for the history is used, we will have to fallback
-    // to the old global history.
-    QWebHistoryInterface* iface = QWebHistoryInterface::defaultInterface();
-    if (iface)
-        return iface->historyContains(QString(reinterpret_cast<QChar*>(url.data()), url.size()));
-
-    return page->group().isLinkVisited(hash);
-}
-
-void PlatformStrategiesQt::addVisitedLink(Page* page, LinkHash hash)
-{
-    page->group().addVisitedLinkHash(hash);
+    */
 }

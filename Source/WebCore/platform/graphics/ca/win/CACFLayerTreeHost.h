@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,10 +26,9 @@
 #ifndef CACFLayerTreeHost_h
 #define CACFLayerTreeHost_h
 
-#if USE(ACCELERATED_COMPOSITING)
-
 #include "AbstractCACFLayerTreeHost.h"
 #include "COMPtr.h"
+#include "Page.h"
 #include "Timer.h"
 
 #include <wtf/HashSet.h>
@@ -54,6 +53,7 @@ namespace WebCore {
 
 class CACFLayerTreeHostClient;
 class PlatformCALayer;
+class TiledBacking;
 
 class CACFLayerTreeHost : public RefCounted<CACFLayerTreeHost>, private AbstractCACFLayerTreeHost {
 public:
@@ -66,7 +66,8 @@ public:
 
     void setRootChildLayer(PlatformCALayer*);
     void setWindow(HWND);
-    virtual void paint();
+    void setPage(Page*);
+    virtual void paint(HDC = nullptr);
     virtual void resize() = 0;
     void flushPendingGraphicsLayerChangesSoon();
     virtual void setShouldInvertColors(bool);
@@ -74,8 +75,13 @@ public:
     virtual GraphicsDeviceAdapter* graphicsDeviceAdapter() const { return 0; }
 #endif
 
+    virtual bool createRenderer() = 0;
+
     // AbstractCACFLayerTreeHost
     virtual void flushPendingLayerChangesNow();
+
+    String layerTreeAsString() const;
+    void updateDebugInfoLayer(bool);
 
 protected:
     CACFLayerTreeHost();
@@ -84,10 +90,11 @@ protected:
     HWND window() const { return m_window; }
     void notifyAnimationsStarted();
 
+    TiledBacking* mainFrameTiledBacking() const;
+
     // AbstractCACFLayerTreeHost
     virtual PlatformCALayer* rootLayer() const;
 
-    virtual bool createRenderer() = 0;
     virtual void destroyRenderer();
     virtual void contextDidChange();
 
@@ -101,24 +108,24 @@ private:
 
     virtual void flushContext() = 0;
     virtual CFTimeInterval lastCommitTime() const = 0;
-    virtual void render(const Vector<CGRect>& dirtyRects = Vector<CGRect>()) = 0;
+    virtual void render(const Vector<CGRect>& dirtyRects = Vector<CGRect>(), HDC dc = nullptr) = 0;
     virtual void initializeContext(void* userData, PlatformCALayer*) = 0;
 
-    CACFLayerTreeHostClient* m_client;
+    CACFLayerTreeHostClient* m_client { nullptr };
+    Page* m_page { nullptr };
     RefPtr<PlatformCALayer> m_rootLayer;
     RefPtr<PlatformCALayer> m_rootChildLayer;
+    RefPtr<PlatformCALayer> m_debugInfoLayer;
     HashSet<RefPtr<PlatformCALayer> > m_pendingAnimatedLayers;
-    HWND m_window;
-    bool m_shouldFlushPendingGraphicsLayerChanges;
-    bool m_isFlushingLayerChanges;
+    HWND m_window { nullptr };
+    bool m_shouldFlushPendingGraphicsLayerChanges { false };
+    bool m_isFlushingLayerChanges { false };
 
 #if !ASSERT_DISABLED
-    enum { WindowNotSet, WindowSet, WindowCleared } m_state;
+    enum { WindowNotSet, WindowSet, WindowCleared } m_state { WindowNotSet };
 #endif
 };
 
 }
-
-#endif // USE(ACCELERATED_COMPOSITING)
 
 #endif // CACFLayerTreeHost_h

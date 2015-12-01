@@ -15,10 +15,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,17 +29,16 @@
  */
 
 #include "config.h"
-
 #include "LocalizedStrings.h"
-#include <wtf/gobject/GOwnPtr.h>
+
 #include "IntSize.h"
 #include "NotImplemented.h"
-#include <wtf/MathExtras.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
-
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
+#include <wtf/MathExtras.h>
+#include <wtf/glib/GUniquePtr.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -452,6 +451,11 @@ String AXFooterRoleDescriptionText()
     return String::fromUTF8(_("footer"));
 }
 
+String AXSearchFieldCancelButtonText()
+{
+    return String::fromUTF8(_("cancel"));
+}
+
 String AXButtonActionVerb()
 {
     return String::fromUTF8(_("press"));
@@ -520,12 +524,6 @@ String insecurePluginVersionText()
     return String();
 }
 
-String inactivePluginText()
-{
-    notImplemented();
-    return String();
-}
-
 String multipleFileUploadText(unsigned numberOfFiles)
 {
     // FIXME: If this file gets localized, this should really be localized as one string with a wildcard for the number.
@@ -539,9 +537,8 @@ String unknownFileSizeText()
 
 String imageTitle(const String& filename, const IntSize& size)
 {
-    GOwnPtr<gchar> string(g_strdup_printf(C_("Title string for images", "%s  (%dx%d pixels)"),
-                                          filename.utf8().data(),
-                                          size.width(), size.height()));
+    GUniquePtr<gchar> string(g_strdup_printf(C_("Title string for images", "%s  (%dx%d pixels)"),
+        filename.utf8().data(), size.width(), size.height()));
 
     return String::fromUTF8(string.get());
 }
@@ -656,28 +653,28 @@ String localizedMediaTimeDescription(float time)
     if (!std::isfinite(time))
         return String::fromUTF8(_("indefinite time"));
 
-    int seconds = static_cast<int>(abs(time));
+    int seconds = abs(static_cast<int>(time));
     int days = seconds / (60 * 60 * 24);
     int hours = seconds / (60 * 60);
     int minutes = (seconds / 60) % 60;
     seconds %= 60;
 
     if (days) {
-        GOwnPtr<gchar> string(g_strdup_printf("%d days %d hours %d minutes %d seconds", days, hours, minutes, seconds));
+        GUniquePtr<gchar> string(g_strdup_printf("%d days %d hours %d minutes %d seconds", days, hours, minutes, seconds));
         return String::fromUTF8(string.get());
     }
 
     if (hours) {
-        GOwnPtr<gchar> string(g_strdup_printf("%d hours %d minutes %d seconds", hours, minutes, seconds));
+        GUniquePtr<gchar> string(g_strdup_printf("%d hours %d minutes %d seconds", hours, minutes, seconds));
         return String::fromUTF8(string.get());
     }
 
     if (minutes) {
-        GOwnPtr<gchar> string(g_strdup_printf("%d minutes %d seconds", minutes, seconds));
+        GUniquePtr<gchar> string(g_strdup_printf("%d minutes %d seconds", minutes, seconds));
         return String::fromUTF8(string.get());
     }
 
-    GOwnPtr<gchar> string(g_strdup_printf("%d seconds", seconds));
+    GUniquePtr<gchar> string(g_strdup_printf("%d seconds", seconds));
     return String::fromUTF8(string.get());
 }
 #endif  // ENABLE(VIDEO)
@@ -783,24 +780,29 @@ String validationMessageBadInputForNumberText()
 }
 
 #if ENABLE(VIDEO_TRACK)
-String textTrackClosedCaptionsText()
-{
-    return String::fromUTF8(C_("Closed Captions", "Menu section heading for closed captions"));
-}
-
 String textTrackSubtitlesText()
 {
-    return String::fromUTF8(C_("Subtitles", "Menu section heading for subtitles"));
+    return String::fromUTF8(C_("Menu section heading for subtitles", "Subtitles"));
 }
 
-String textTrackOffText()
+String textTrackOffMenuItemText()
 {
-    return String::fromUTF8(C_("Off", "Menu item label for the track that represents disabling closed captions"));
+    return String::fromUTF8(C_("Menu item label for the track that represents disabling closed captions", "Off"));
+}
+
+String textTrackAutomaticMenuItemText()
+{
+    return String::fromUTF8(C_("Menu item label for the automatically choosen track", "Auto"));
 }
 
 String textTrackNoLabelText()
 {
-    return String::fromUTF8(C_("No label", "Menu item label for a closed captions track that has no other name"));
+    return String::fromUTF8(C_("Menu item label for a closed captions track that has no other name", "No label"));
+}
+
+String audioTrackNoLabelText()
+{
+    return String::fromUTF8(C_("Menu item label for an audio track that has no other name", "No label"));
 }
 #endif
 

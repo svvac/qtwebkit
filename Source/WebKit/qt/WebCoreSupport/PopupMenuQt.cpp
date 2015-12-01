@@ -102,9 +102,9 @@ void PopupMenuQt::show(const IntRect& rect, FrameView* view, int index)
     QRect geometry(rect);
     geometry.moveTopLeft(view->contentsToWindow(rect.location()));
     m_popup->setGeometry(geometry);
-    m_popup->setFont(m_popupClient->menuStyle().font().syntheticFont());
+    //m_popup->setFont(m_popupClient->menuStyle().font().syntheticFont());
 
-    m_selectData = adoptPtr(new SelectData(m_popupClient));
+    m_selectData = std::make_unique<SelectData>(m_popupClient);
     m_popup->show(*m_selectData.get());
 }
 

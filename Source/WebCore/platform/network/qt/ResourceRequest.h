@@ -21,7 +21,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef ResourceRequest_h
@@ -38,24 +38,24 @@ class NetworkingContext;
 
     class ResourceRequest : public ResourceRequestBase {
     public:
-        ResourceRequest(const String& url) 
-            : ResourceRequestBase(KURL(ParsedURLString, url), UseProtocolCachePolicy)
+        ResourceRequest(const String& url)
+            : ResourceRequestBase(URL(ParsedURLString, url), UseProtocolCachePolicy)
         {
         }
 
-        ResourceRequest(const KURL& url) 
+        ResourceRequest(const URL& url)
             : ResourceRequestBase(url, UseProtocolCachePolicy)
         {
         }
 
-        ResourceRequest(const KURL& url, const String& referrer, ResourceRequestCachePolicy policy = UseProtocolCachePolicy) 
+        ResourceRequest(const URL& url, const String& referrer, ResourceRequestCachePolicy policy = UseProtocolCachePolicy)
             : ResourceRequestBase(url, policy)
         {
             setHTTPReferrer(referrer);
         }
 
         ResourceRequest()
-            : ResourceRequestBase(KURL(), UseProtocolCachePolicy)
+            : ResourceRequestBase(URL(), UseProtocolCachePolicy)
         {
         }
 
@@ -71,8 +71,8 @@ class NetworkingContext;
         void doUpdatePlatformHTTPBody() { }
         void doUpdateResourceHTTPBody() { }
 
-        PassOwnPtr<CrossThreadResourceRequestData> doPlatformCopyData(PassOwnPtr<CrossThreadResourceRequestData> data) const { return data; }
-        void doPlatformAdopt(PassOwnPtr<CrossThreadResourceRequestData>) { }
+        std::unique_ptr<CrossThreadResourceRequestData> doPlatformCopyData(std::unique_ptr<CrossThreadResourceRequestData> data) const { return data; }
+        void doPlatformAdopt(std::unique_ptr<CrossThreadResourceRequestData>) { }
     };
 
     struct CrossThreadResourceRequestData : public CrossThreadResourceRequestDataBase {

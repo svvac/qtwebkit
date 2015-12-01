@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,32 +32,24 @@
 #ifndef WorkerConsoleAgent_h
 #define WorkerConsoleAgent_h
 
-#include "InspectorConsoleAgent.h"
-#include <wtf/PassOwnPtr.h>
-
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#include "InspectorWebAgentBase.h"
+#include "WebConsoleAgent.h"
 
 namespace WebCore {
 
-class WorkerConsoleAgent : public InspectorConsoleAgent {
+class WorkerConsoleAgent final : public WebConsoleAgent {
     WTF_MAKE_NONCOPYABLE(WorkerConsoleAgent);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<WorkerConsoleAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager)
-    {
-        return adoptPtr(new WorkerConsoleAgent(instrumentingAgents, state, injectedScriptManager));
-    }
-    virtual ~WorkerConsoleAgent();
+    WorkerConsoleAgent(WorkerAgentContext&);
+    virtual ~WorkerConsoleAgent() { }
 
-    virtual bool isWorkerAgent() OVERRIDE { return true; }
+    virtual bool isWorkerAgent() const override { return true; }
 
 private:
-    WorkerConsoleAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*);
-    virtual void addInspectedNode(ErrorString*, int nodeId);
-    virtual bool developerExtrasEnabled();
+    virtual void addInspectedNode(ErrorString&, int nodeId) override;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR) && ENABLE(WORKERS)
 
 #endif // !defined(WorkerConsoleAgent_h)

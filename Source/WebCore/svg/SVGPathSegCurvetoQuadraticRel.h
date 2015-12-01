@@ -22,16 +22,15 @@
 #ifndef SVGPathSegCurvetoQuadraticRel_h
 #define SVGPathSegCurvetoQuadraticRel_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegCurvetoQuadratic.h"
 
 namespace WebCore {
 
 class SVGPathSegCurvetoQuadraticRel : public SVGPathSegCurvetoQuadratic {
 public:
-    static PassRefPtr<SVGPathSegCurvetoQuadraticRel> create(SVGPathElement* element, SVGPathSegRole role, float x, float y, float x1, float y1)
+    static Ref<SVGPathSegCurvetoQuadraticRel> create(SVGPathElement* element, SVGPathSegRole role, float x, float y, float x1, float y1)
     {
-        return adoptRef(new SVGPathSegCurvetoQuadraticRel(element, role, x, y, x1, y1));
+        return adoptRef(*new SVGPathSegCurvetoQuadraticRel(element, role, x, y, x1, y1));
     }
 
 private:
@@ -40,11 +39,10 @@ private:
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_CURVETO_QUADRATIC_REL; }
-    virtual String pathSegTypeAsLetter() const { return "q"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_CURVETO_QUADRATIC_REL; }
+    virtual String pathSegTypeAsLetter() const override { return "q"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

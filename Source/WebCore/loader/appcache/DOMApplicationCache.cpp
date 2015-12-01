@@ -30,7 +30,6 @@
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Event.h"
-#include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
@@ -50,7 +49,7 @@ DOMApplicationCache::DOMApplicationCache(Frame* frame)
 void DOMApplicationCache::disconnectFrameForPageCache()
 {
     if (ApplicationCacheHost* cacheHost = applicationCacheHost())
-        cacheHost->setDOMApplicationCache(0);
+        cacheHost->setDOMApplicationCache(nullptr);
     DOMWindowProperty::disconnectFrameForPageCache();
 }
 
@@ -64,15 +63,15 @@ void DOMApplicationCache::reconnectFrameFromPageCache(Frame* frame)
 void DOMApplicationCache::willDestroyGlobalObjectInFrame()
 {
     if (ApplicationCacheHost* cacheHost = applicationCacheHost())
-        cacheHost->setDOMApplicationCache(0);
+        cacheHost->setDOMApplicationCache(nullptr);
     DOMWindowProperty::willDestroyGlobalObjectInFrame();
 }
 
 ApplicationCacheHost* DOMApplicationCache::applicationCacheHost() const
 {
-    if (!m_frame || !m_frame->loader()->documentLoader())
-        return 0;
-    return m_frame->loader()->documentLoader()->applicationCacheHost();
+    if (!m_frame || !m_frame->loader().documentLoader())
+        return nullptr;
+    return m_frame->loader().documentLoader()->applicationCacheHost();
 }
 
 unsigned short DOMApplicationCache::status() const
@@ -104,16 +103,11 @@ void DOMApplicationCache::abort()
         cacheHost->abort();
 }
 
-const AtomicString& DOMApplicationCache::interfaceName() const
-{
-    return eventNames().interfaceForDOMApplicationCache;
-}
-
 ScriptExecutionContext* DOMApplicationCache::scriptExecutionContext() const
 {
     if (m_frame)
         return m_frame->document();
-    return 0;
+    return nullptr;
 }
 
 const AtomicString& DOMApplicationCache::toEventType(ApplicationCacheHost::EventID id)
@@ -138,16 +132,6 @@ const AtomicString& DOMApplicationCache::toEventType(ApplicationCacheHost::Event
     }
     ASSERT_NOT_REACHED();
     return eventNames().errorEvent;
-}
-
-EventTargetData* DOMApplicationCache::eventTargetData()
-{
-    return &m_eventTargetData;
-}
-
-EventTargetData* DOMApplicationCache::ensureEventTargetData()
-{
-    return &m_eventTargetData;
 }
 
 } // namespace WebCore

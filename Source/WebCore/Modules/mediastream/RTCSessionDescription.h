@@ -34,6 +34,7 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "ExceptionBase.h"
+#include "ScriptWrappable.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
@@ -43,17 +44,17 @@ namespace WebCore {
 class Dictionary;
 class RTCSessionDescriptionDescriptor;
 
-class RTCSessionDescription : public RefCounted<RTCSessionDescription> {
+class RTCSessionDescription : public RefCounted<RTCSessionDescription>, public ScriptWrappable {
 public:
-    static PassRefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
-    static PassRefPtr<RTCSessionDescription> create(PassRefPtr<RTCSessionDescriptionDescriptor>);
+    static RefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
+    static RefPtr<RTCSessionDescription> create(PassRefPtr<RTCSessionDescriptionDescriptor>);
     virtual ~RTCSessionDescription();
 
     const String& type() const;
     void setType(const String&, ExceptionCode&);
 
     const String& sdp() const;
-    void setSdp(const String&, ExceptionCode&);
+    void setSdp(const String&);
 
     RTCSessionDescriptionDescriptor* descriptor();
 

@@ -53,24 +53,28 @@ IconDatabaseClientQt::~IconDatabaseClientQt()
 {
 }
 
-void IconDatabaseClientQt::didRemoveAllIcons()
-{
-}
-
-void IconDatabaseClientQt::didImportIconURLForPageURL(const String& url)
+void IconDatabaseClientQt::didImportIconURLForPageURL(const String&)
 {
 }
 
 void IconDatabaseClientQt::didImportIconDataForPageURL(const String& url)
 {
-    emit iconLoadedForPageURL(url);
+  emit iconLoadedForPageURL(url);
 }
 
-void IconDatabaseClientQt::didChangeIconForPageURL(const String& url)
+void IconDatabaseClientQt::didChangeIconForPageURL(const String&)
+{
+}
+
+void IconDatabaseClientQt::didRemoveAllIcons()
 {
 }
 
 void IconDatabaseClientQt::didFinishURLImport()
+{
+}
+
+void IconDatabaseClientQt::didClose()
 {
 }
 

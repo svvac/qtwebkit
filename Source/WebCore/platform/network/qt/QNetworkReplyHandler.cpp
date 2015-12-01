@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015 The Qt Company Ltd
+    Copyright (C) 2008, 2012 Digia Plc. and/or its subsidiary(-ies)
     Copyright (C) 2007 Staikos Computing Services Inc.  <info@staikos.net>
     Copyright (C) 2008 Holger Hans Peter Freyther
 
@@ -41,7 +41,7 @@
 
 #include <QCoreApplication>
 
-static const int gMaxRedirections = 10;
+static const int gMaxRedirections = 20;
 
 namespace WebCore {
 
@@ -50,11 +50,10 @@ FormDataIODevice::FormDataIODevice(FormData* data)
     , m_currentDelta(0)
     , m_fileSize(0)
     , m_dataSize(0)
-    , m_formData(data)
 {
     setOpenMode(FormDataIODevice::ReadOnly);
 
-    prepareFormElements();
+    prepareFormElements(data);
     prepareCurrentElement();
     computeSize();
 }
@@ -64,48 +63,30 @@ FormDataIODevice::~FormDataIODevice()
     delete m_currentFile;
 }
 
-bool FormDataIODevice::reset()
+void FormDataIODevice::prepareFormElements(FormData* formData)
 {
-    if (m_currentFile)
-        m_currentFile->close();
-
-    m_currentDelta = 0;
-    m_formElements = m_formData->elements();
-
-    prepareCurrentElement();
-    return true;
-}
-
-void FormDataIODevice::prepareFormElements()
-{
-    if (!m_formData)
+    if (!formData)
         return;
 
+    RefPtr<FormData> formDataRef(formData);
+
 #if ENABLE(BLOB)
-    m_formData = m_formData->resolveBlobReferences();
+    formDataRef = formDataRef->resolveBlobReferences();
 #endif
 
     // Take a deep copy of the FormDataElements
-    m_formElements = m_formData->elements();
+    m_formElements = formDataRef->elements();
 }
 
-
-qint64 FormDataIODevice::computeSize() 
+qint64 FormDataIODevice::computeSize()
 {
     for (int i = 0; i < m_formElements.size(); ++i) {
         const FormDataElement& element = m_formElements[i];
-        if (element.m_type == FormDataElement::data) 
+        if (element.m_type == FormDataElement::Type::Data)
             m_dataSize += element.m_data.size();
         else {
             QFileInfo fi(element.m_filename);
-#if ENABLE(BLOB)
-            qint64 fileEnd = fi.size();
-            if (element.m_fileLength != BlobDataItem::toEndOfFile)
-                fileEnd = qMin<qint64>(fi.size(), element.m_fileStart + element.m_fileLength);
-            m_fileSize += qMax<qint64>(0, fileEnd - element.m_fileStart);
-#else
             m_fileSize += fi.size();
-#endif
         }
     }
     return m_dataSize + m_fileSize;
@@ -128,9 +109,9 @@ void FormDataIODevice::prepareCurrentElement()
         return;
 
     switch (m_formElements[0].m_type) {
-    case FormDataElement::data:
+    case FormDataElement::Type::Data:
         return;
-    case FormDataElement::encodedFile:
+    case FormDataElement::Type::EncodedFile:
         openFileForCurrentElement();
         break;
     default:
@@ -146,17 +127,6 @@ void FormDataIODevice::openFileForCurrentElement()
 
     m_currentFile->setFileName(m_formElements[0].m_filename);
     m_currentFile->open(QFile::ReadOnly);
-#if ENABLE(BLOB)
-    if (isValidFileTime(m_formElements[0].m_expectedFileModificationTime)) {
-        QFileInfo info(*m_currentFile);
-        if (!info.exists() || static_cast<time_t>(m_formElements[0].m_expectedFileModificationTime) < info.lastModified().toTime_t()) {
-            moveToNextElement();
-            return;
-        }
-    }
-    if (m_formElements[0].m_fileStart)
-        m_currentFile->seek(m_formElements[0].m_fileStart);
-#endif
 }
 
 // m_formElements[0] is the current item. If the destination buffer is
@@ -171,7 +141,7 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
         const FormDataElement& element = m_formElements[0];
         const qint64 available = size-copied;
 
-        if (element.m_type == FormDataElement::data) {
+        if (element.m_type == FormDataElement::Type::Data) {
             const qint64 toCopy = qMin<qint64>(available, element.m_data.size() - m_currentDelta);
             memcpy(destination+copied, element.m_data.data()+m_currentDelta, toCopy); 
             m_currentDelta += toCopy;
@@ -179,12 +149,8 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
 
             if (m_currentDelta == element.m_data.size())
                 moveToNextElement();
-        } else if (element.m_type == FormDataElement::encodedFile) {
+        } else if (element.m_type == FormDataElement::Type::EncodedFile) {
             quint64 toCopy = available;
-#if ENABLE(BLOB)
-            if (element.m_fileLength != BlobDataItem::toEndOfFile)
-                toCopy = qMin<qint64>(toCopy, element.m_fileLength - m_currentDelta);
-#endif
             const QByteArray data = m_currentFile->read(toCopy);
             memcpy(destination+copied, data.constData(), data.size());
             m_currentDelta += data.size();
@@ -192,10 +158,6 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
 
             if (m_currentFile->atEnd() || !m_currentFile->isOpen())
                 moveToNextElement();
-#if ENABLE(BLOB)
-            else if (element.m_fileLength != BlobDataItem::toEndOfFile && m_currentDelta == element.m_fileLength)
-                moveToNextElement();
-#endif
         }
     }
 
@@ -308,7 +270,6 @@ QNetworkReply* QNetworkReplyWrapper::release()
     m_reply->disconnect(this);
     QNetworkReply* reply = m_reply;
     m_reply = 0;
-    m_sniffer = nullptr;
 
     return reply;
 }
@@ -351,28 +312,10 @@ void QNetworkReplyWrapper::receiveMetaData()
         emitMetaDataChanged();
         return;
     }
-
-    bool isSupportedImageType = MIMETypeRegistry::isSupportedImageMIMEType(m_advertisedMIMEType);
-
-    Q_ASSERT(!m_sniffer);
-
-    m_sniffer = adoptPtr(new QtMIMETypeSniffer(m_reply, m_advertisedMIMEType, isSupportedImageType));
-
-    if (m_sniffer->isFinished()) {
-        receiveSniffedMIMEType();
-        return;
-    }
-
-    connect(m_sniffer.get(), SIGNAL(finished()), this, SLOT(receiveSniffedMIMEType()));
 }
 
 void QNetworkReplyWrapper::receiveSniffedMIMEType()
 {
-    Q_ASSERT(m_sniffer);
-
-    m_sniffedMIMEType = m_sniffer->mimeType();
-    m_sniffer = nullptr;
-
     emitMetaDataChanged();
 }
 
@@ -389,7 +332,6 @@ void QNetworkReplyWrapper::setFinished()
 void QNetworkReplyWrapper::replyDestroyed()
 {
     m_reply = 0;
-    m_sniffer = nullptr;
 }
 
 void QNetworkReplyWrapper::emitMetaDataChanged()
@@ -464,7 +406,7 @@ QNetworkReplyHandler::QNetworkReplyHandler(ResourceHandle* handle, LoadType load
         m_method = QNetworkAccessManager::PostOperation;
     else if (r.httpMethod() == "PUT")
         m_method = QNetworkAccessManager::PutOperation;
-    else if (r.httpMethod() == "DELETE" && !r.httpBody()) // A delete with a body is a custom operation.
+    else if (r.httpMethod() == "DELETE")
         m_method = QNetworkAccessManager::DeleteOperation;
     else
         m_method = QNetworkAccessManager::CustomOperation;
@@ -549,7 +491,7 @@ void QNetworkReplyHandler::timeout()
 
     ResourceHandleClient* client = m_resourceHandle->client();
     if (!client) {
-        m_replyWrapper.clear();
+        m_replyWrapper.reset();
         return;
     }
 
@@ -559,12 +501,12 @@ void QNetworkReplyHandler::timeout()
     timeoutError.setIsTimeout(true);
     client->didFail(m_resourceHandle, timeoutError);
 
-    m_replyWrapper.clear();
+    m_replyWrapper.reset();
 }
 
 void QNetworkReplyHandler::timerEvent(QTimerEvent* timerEvent)
 {
-    ASSERT_UNUSED(timerEvent, timerEvent->timerId()== m_timeoutTimer.timerId());
+    ASSERT_UNUSED(timerEvent, timerEvent->timerId() == m_timeoutTimer.timerId());
     m_timeoutTimer.stop();
     timeout();
 }
@@ -587,10 +529,10 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
         mimeType = MIMETypeRegistry::getMIMETypeForPath(m_replyWrapper->reply()->url().path());
     }
 
-    KURL url(m_replyWrapper->reply()->url());
+    URL url(m_replyWrapper->reply()->url());
     ResourceResponse response(url, mimeType.lower(),
                               m_replyWrapper->reply()->header(QNetworkRequest::ContentLengthHeader).toLongLong(),
-                              m_replyWrapper->encoding(), String());
+                              m_replyWrapper->encoding());
 
     if (url.isLocalFile()) {
         client->didReceiveResponse(m_resourceHandle, response);
@@ -683,10 +625,6 @@ void QNetworkReplyHandler::forwardData()
 {
     ASSERT(m_replyWrapper && m_replyWrapper->reply() && !wasAborted() && !m_replyWrapper->wasRedirected());
 
-    // reply may be closed if reply->close() or reply->abort() is called
-    if (!m_replyWrapper->reply()->isReadable())
-        return;
-
     ResourceHandleClient* client = m_resourceHandle->client();
     if (!client)
         return;
@@ -702,12 +640,9 @@ void QNetworkReplyHandler::forwardData()
         // -1 means we do not provide any data about transfer size to inspector so it would use
         // Content-Length headers or content size to show transfer size.
         client->didReceiveData(m_resourceHandle, buffer, readSize, -1);
-        // Check if the request has been aborted or this reply-handler was otherwise released.
-        if (wasAborted() || !m_replyWrapper)
-            break;
     }
     delete[] buffer;
-    if (bytesAvailable > 0 && m_replyWrapper)
+    if (bytesAvailable > 0)
         m_queue.requeue(&QNetworkReplyHandler::forwardData);
 }
 
@@ -810,7 +745,7 @@ void QNetworkReplyHandler::start()
     if (!reply)
         return;
 
-    m_replyWrapper = adoptPtr(new QNetworkReplyWrapper(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this));
+    m_replyWrapper = std::make_unique<QNetworkReplyWrapper>(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this);
 
     if (m_loadType == SynchronousLoad) {
         m_replyWrapper->synchronousLoad();

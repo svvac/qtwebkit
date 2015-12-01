@@ -25,41 +25,41 @@
 
 namespace JSC {
 
-    class DatePrototype;
+class DatePrototype;
 
-    class DateConstructor : public InternalFunction {
-    public:
-        typedef InternalFunction Base;
+class DateConstructor : public InternalFunction {
+public:
+    typedef InternalFunction Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static DateConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, DatePrototype* datePrototype)
-        {
-            DateConstructor* constructor = new (NotNull, allocateCell<DateConstructor>(*exec->heap())) DateConstructor(globalObject, structure);
-            constructor->finishCreation(exec, datePrototype);
-            return constructor;
-        }
+    static DateConstructor* create(VM& vm, Structure* structure, DatePrototype* datePrototype)
+    {
+        DateConstructor* constructor = new (NotNull, allocateCell<DateConstructor>(vm.heap)) DateConstructor(vm, structure);
+        constructor->finishCreation(vm, datePrototype);
+        return constructor;
+    }
 
-        static const ClassInfo s_info;
+    DECLARE_INFO;
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
 
-    protected:
-        void finishCreation(ExecState*, DatePrototype*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
+protected:
+    void finishCreation(VM&, DatePrototype*);
 
-    private:
-        DateConstructor(JSGlobalObject*, Structure*);
-        static ConstructType getConstructData(JSCell*, ConstructData&);
-        static CallType getCallData(JSCell*, CallData&);
+private:
+    DateConstructor(VM&, Structure*);
+    static ConstructType getConstructData(JSCell*, ConstructData&);
+    static CallType getCallData(JSCell*, CallData&);
 
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+};
 
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-    };
+JSObject* constructDate(ExecState*, JSGlobalObject*, const ArgList&);
 
-    JSObject* constructDate(ExecState*, JSGlobalObject*, const ArgList&);
+EncodedJSValue JSC_HOST_CALL dateNow(ExecState*);
 
 } // namespace JSC
 

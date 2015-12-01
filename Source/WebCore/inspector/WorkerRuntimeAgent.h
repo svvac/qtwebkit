@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,41 +32,37 @@
 #ifndef WorkerRuntimeAgent_h
 #define WorkerRuntimeAgent_h
 
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
-
-#include "InspectorRuntimeAgent.h"
-#include <wtf/PassOwnPtr.h>
+#include "InspectorWebAgentBase.h"
+#include <inspector/agents/InspectorRuntimeAgent.h>
 
 namespace WebCore {
 
 class WorkerGlobalScope;
+typedef String ErrorString;
 
-class WorkerRuntimeAgent : public InspectorRuntimeAgent {
+class WorkerRuntimeAgent final : public Inspector::InspectorRuntimeAgent {
 public:
-    static PassOwnPtr<WorkerRuntimeAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* context)
-    {
-        return adoptPtr(new WorkerRuntimeAgent(instrumentingAgents, state, injectedScriptManager, context));
-    }
-    virtual ~WorkerRuntimeAgent();
+    WorkerRuntimeAgent(WorkerAgentContext&);
+    virtual ~WorkerRuntimeAgent() { }
 
-    // Protocol commands.
-    virtual void run(ErrorString*);
+    virtual void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) override;
+    virtual void willDestroyFrontendAndBackend(Inspector::DisconnectReason) override;
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
+    virtual void run(ErrorString&) override;
+
     void pauseWorkerGlobalScope(WorkerGlobalScope*);
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 private:
-    WorkerRuntimeAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*, WorkerGlobalScope*);
-    virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId);
-    virtual void muteConsole();
-    virtual void unmuteConsole();
-    WorkerGlobalScope* m_workerGlobalScope;
-    bool m_paused;
+    virtual Inspector::InjectedScript injectedScriptForEval(ErrorString&, const int* executionContextId) override;
+    virtual void muteConsole() override;
+    virtual void unmuteConsole() override;
+
+    RefPtr<Inspector::RuntimeBackendDispatcher> m_backendDispatcher;
+    WorkerGlobalScope& m_workerGlobalScope;
+
+    bool m_paused { false };
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorPagerAgent_h)

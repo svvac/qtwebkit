@@ -14,19 +14,29 @@ INCLUDEPATH += \
     $$SOURCE_DIR/.. \
     $$SOURCE_DIR/../WTF \
     $$SOURCE_DIR/assembler \
+    $$SOURCE_DIR/bindings \
+    $$SOURCE_DIR/builtins \
     $$SOURCE_DIR/bytecode \
     $$SOURCE_DIR/bytecompiler \
     $$SOURCE_DIR/heap \
     $$SOURCE_DIR/dfg \
     $$SOURCE_DIR/debugger \
     $$SOURCE_DIR/disassembler \
+    $$SOURCE_DIR/ftl \
+    $$SOURCE_DIR/generated \
+    $$SOURCE_DIR/generated/inspector \
     $$SOURCE_DIR/interpreter \
+    $$SOURCE_DIR/inspector \
+    $$SOURCE_DIR/inspector/agents \
+    $$SOURCE_DIR/inspector/augmentable \
+    $$SOURCE_DIR/inspector/remote \
     $$SOURCE_DIR/jit \
     $$SOURCE_DIR/llint \
     $$SOURCE_DIR/parser \
     $$SOURCE_DIR/profiler \
     $$SOURCE_DIR/runtime \
     $$SOURCE_DIR/tools \
+    $$SOURCE_DIR/wasm \
     $$SOURCE_DIR/yarr \
     $$SOURCE_DIR/API \
     $$SOURCE_DIR/ForwardingHeaders \
@@ -37,10 +47,6 @@ INCLUDEPATH += \
 macx: INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR/$$targetSubDir()
 
 win32-*: LIBS += -lwinmm
-
-wince* {
-    INCLUDEPATH += $$SOURCE_DIR/os-win32
-}
 
 linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
     INCLUDEPATH += $$SOURCE_DIR/disassembler/udis86

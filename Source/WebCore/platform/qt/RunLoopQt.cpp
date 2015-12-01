@@ -25,7 +25,6 @@
  */
 
 #include "config.h"
-#include "RunLoop.h"
 
 #include <QAbstractEventDispatcher>
 #include <QCoreApplication>
@@ -59,38 +58,15 @@ private:
     QMetaMethod m_method;
 };
 
-static QEventLoop* currentEventLoop;
 
 void RunLoop::run()
 {
-    static bool mainEventLoopIsRunning = false;
-    if (!mainEventLoopIsRunning) {
-        mainEventLoopIsRunning = true;
-        QCoreApplication::exec();
-        mainEventLoopIsRunning = false;
-    } else {
-        QEventLoop eventLoop;
 
-        QEventLoop* previousEventLoop = currentEventLoop;
-        currentEventLoop = &eventLoop;
-
-        eventLoop.exec();
-
-        currentEventLoop = previousEventLoop;
-    }
 }
 
 void RunLoop::stop()
 {
-    if (currentEventLoop)
-        currentEventLoop->exit();
-    else
-        QCoreApplication::exit();
-}
 
-RunLoop::RunLoop()
-    : m_timerObject(new TimerObject(this))
-{
 }
 
 RunLoop::~RunLoop()
@@ -107,18 +83,7 @@ void RunLoop::wakeUp()
 
 void RunLoop::TimerBase::timerFired(RunLoop* runLoop, int ID)
 {
-    TimerMap::iterator it = runLoop->m_activeTimers.find(ID);
-    ASSERT(it != runLoop->m_activeTimers.end());
-    TimerBase* timer = it->value;
 
-    if (!timer->m_isRepeating) {
-        // Stop the timer (calling stop would need another hash table lookup).
-        runLoop->m_activeTimers.remove(it);
-        runLoop->m_timerObject->killTimer(timer->m_ID);
-        timer->m_ID = 0;
-    }
-
-    timer->fired();
 }
 
 RunLoop::TimerBase::TimerBase(RunLoop* runLoop)

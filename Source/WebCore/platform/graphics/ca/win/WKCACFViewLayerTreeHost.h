@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,8 +26,6 @@
 #ifndef WKCACFViewLayerTreeHost_h
 #define WKCACFViewLayerTreeHost_h
 
-#if USE(ACCELERATED_COMPOSITING)
-
 #include "CACFLayerTreeHost.h"
 
 typedef struct _WKCACFView* WKCACFViewRef;
@@ -38,6 +36,8 @@ class WKCACFViewLayerTreeHost : public CACFLayerTreeHost {
 public:
     static PassRefPtr<WKCACFViewLayerTreeHost> create();
 
+    virtual bool createRenderer();
+
 private:
     WKCACFViewLayerTreeHost();
 
@@ -46,16 +46,15 @@ private:
 
     virtual void initializeContext(void* userData, PlatformCALayer*);
     virtual void resize();
-    virtual bool createRenderer();
     virtual void destroyRenderer();
     virtual void flushContext();
     virtual void contextDidChange();
-    virtual void paint();
-    virtual void render(const Vector<CGRect>& dirtyRects = Vector<CGRect>());
+    void paint(HDC = nullptr) override;
+    void render(const Vector<CGRect>& dirtyRects = Vector<CGRect>(), HDC dc = nullptr) override;
     virtual CFTimeInterval lastCommitTime() const;
     virtual void setShouldInvertColors(bool);
 #if USE(AVFOUNDATION)
-    virtual GraphicsDeviceAdapter* graphicsDeviceAdapter() const OVERRIDE;
+    virtual GraphicsDeviceAdapter* graphicsDeviceAdapter() const override;
 #endif
 
     RetainPtr<WKCACFViewRef> m_view;
@@ -63,7 +62,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // USE(ACCELERATED_COMPOSITING)
 
 #endif // WKCACFViewLayerTreeHost_h

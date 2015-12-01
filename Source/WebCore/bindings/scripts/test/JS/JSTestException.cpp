@@ -21,8 +21,9 @@
 #include "config.h"
 #include "JSTestException.h"
 
-#include "KURL.h"
-#include "TestException.h"
+#include "JSDOMBinding.h"
+#include "JSDOMConstructor.h"
+#include "URL.h"
 #include <runtime/JSString.h>
 #include <wtf/GetPtr.h>
 
@@ -30,81 +31,91 @@ using namespace JSC;
 
 namespace WebCore {
 
+// Attributes
+
+JSC::EncodedJSValue jsTestExceptionName(JSC::ExecState*, JSC::JSObject*, JSC::EncodedJSValue, JSC::PropertyName);
+JSC::EncodedJSValue jsTestExceptionConstructor(JSC::ExecState*, JSC::JSObject*, JSC::EncodedJSValue, JSC::PropertyName);
+
+class JSTestExceptionPrototype : public JSC::JSNonFinalObject {
+public:
+    typedef JSC::JSNonFinalObject Base;
+    static JSTestExceptionPrototype* create(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::Structure* structure)
+    {
+        JSTestExceptionPrototype* ptr = new (NotNull, JSC::allocateCell<JSTestExceptionPrototype>(vm.heap)) JSTestExceptionPrototype(vm, globalObject, structure);
+        ptr->finishCreation(vm);
+        return ptr;
+    }
+
+    DECLARE_INFO;
+    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
+    {
+        return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
+    }
+
+private:
+    JSTestExceptionPrototype(JSC::VM& vm, JSC::JSGlobalObject*, JSC::Structure* structure)
+        : JSC::JSNonFinalObject(vm, structure)
+    {
+    }
+
+    void finishCreation(JSC::VM&);
+};
+
+typedef JSDOMConstructorNotConstructable<JSTestException> JSTestExceptionConstructor;
+
 /* Hash table */
+
+static const struct CompactHashIndex JSTestExceptionTableIndex[2] = {
+    { -1, -1 },
+    { 0, -1 },
+};
+
 
 static const HashTableValue JSTestExceptionTableValues[] =
 {
-    { "name", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestExceptionName), (intptr_t)0, NoIntrinsic },
-    { "constructor", DontEnum | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestExceptionConstructor), (intptr_t)0, NoIntrinsic },
-    { 0, 0, 0, 0, NoIntrinsic }
+    { "name", DontDelete | ReadOnly | CustomAccessor, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestExceptionName), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(0) } },
 };
 
-static const HashTable JSTestExceptionTable = { 5, 3, JSTestExceptionTableValues, 0 };
-/* Hash table for constructor */
-
-static const HashTableValue JSTestExceptionConstructorTableValues[] =
+static const HashTable JSTestExceptionTable = { 1, 1, true, JSTestExceptionTableValues, JSTestExceptionTableIndex };
+template<> void JSTestExceptionConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-    { 0, 0, 0, 0, NoIntrinsic }
-};
-
-static const HashTable JSTestExceptionConstructorTable = { 1, 0, JSTestExceptionConstructorTableValues, 0 };
-const ClassInfo JSTestExceptionConstructor::s_info = { "TestExceptionConstructor", &Base::s_info, &JSTestExceptionConstructorTable, 0, CREATE_METHOD_TABLE(JSTestExceptionConstructor) };
-
-JSTestExceptionConstructor::JSTestExceptionConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
-    : DOMConstructorObject(structure, globalObject)
-{
+    putDirect(vm, vm.propertyNames->prototype, JSTestException::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestException"))), ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
 
-void JSTestExceptionConstructor::finishCreation(ExecState* exec, JSDOMGlobalObject* globalObject)
-{
-    Base::finishCreation(exec->vm());
-    ASSERT(inherits(&s_info));
-    putDirect(exec->vm(), exec->propertyNames().prototype, JSTestExceptionPrototype::self(exec, globalObject), DontDelete | ReadOnly);
-    putDirect(exec->vm(), exec->propertyNames().length, jsNumber(0), ReadOnly | DontDelete | DontEnum);
-}
-
-bool JSTestExceptionConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    return getStaticValueSlot<JSTestExceptionConstructor, JSDOMWrapper>(exec, &JSTestExceptionConstructorTable, jsCast<JSTestExceptionConstructor*>(cell), propertyName, slot);
-}
-
-bool JSTestExceptionConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    return getStaticValueDescriptor<JSTestExceptionConstructor, JSDOMWrapper>(exec, &JSTestExceptionConstructorTable, jsCast<JSTestExceptionConstructor*>(object), propertyName, descriptor);
-}
+template<> const ClassInfo JSTestExceptionConstructor::s_info = { "TestExceptionConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestExceptionConstructor) };
 
 /* Hash table for prototype */
 
 static const HashTableValue JSTestExceptionPrototypeTableValues[] =
 {
-    { 0, 0, 0, 0, NoIntrinsic }
+    { "constructor", DontEnum | ReadOnly, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestExceptionConstructor), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(0) } },
 };
 
-static const HashTable JSTestExceptionPrototypeTable = { 1, 0, JSTestExceptionPrototypeTableValues, 0 };
-const ClassInfo JSTestExceptionPrototype::s_info = { "TestExceptionPrototype", &Base::s_info, &JSTestExceptionPrototypeTable, 0, CREATE_METHOD_TABLE(JSTestExceptionPrototype) };
+const ClassInfo JSTestExceptionPrototype::s_info = { "TestExceptionPrototype", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestExceptionPrototype) };
 
-JSObject* JSTestExceptionPrototype::self(ExecState* exec, JSGlobalObject* globalObject)
-{
-    return getDOMPrototype<JSTestException>(exec, globalObject);
-}
-
-const ClassInfo JSTestException::s_info = { "TestException", &Base::s_info, &JSTestExceptionTable, 0 , CREATE_METHOD_TABLE(JSTestException) };
-
-JSTestException::JSTestException(Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestException> impl)
-    : JSDOMWrapper(structure, globalObject)
-    , m_impl(impl.leakRef())
-{
-}
-
-void JSTestException::finishCreation(VM& vm)
+void JSTestExceptionPrototype::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    reifyStaticProperties(vm, JSTestExceptionPrototypeTableValues, *this);
 }
 
-JSObject* JSTestException::createPrototype(ExecState* exec, JSGlobalObject* globalObject)
+const ClassInfo JSTestException::s_info = { "TestException", &Base::s_info, &JSTestExceptionTable, CREATE_METHOD_TABLE(JSTestException) };
+
+JSTestException::JSTestException(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestException>&& impl)
+    : JSDOMWrapper<TestException>(structure, globalObject, WTF::move(impl))
 {
-    return JSTestExceptionPrototype::create(exec->vm(), globalObject, JSTestExceptionPrototype::createStructure(globalObject->vm(), globalObject, globalObject->errorPrototype()));
+}
+
+JSObject* JSTestException::createPrototype(VM& vm, JSGlobalObject* globalObject)
+{
+    return JSTestExceptionPrototype::create(vm, globalObject, JSTestExceptionPrototype::createStructure(vm, globalObject, globalObject->errorPrototype()));
+}
+
+JSObject* JSTestException::getPrototype(VM& vm, JSGlobalObject* globalObject)
+{
+    return getDOMPrototype<JSTestException>(vm, globalObject);
 }
 
 void JSTestException::destroy(JSC::JSCell* cell)
@@ -113,68 +124,52 @@ void JSTestException::destroy(JSC::JSCell* cell)
     thisObject->JSTestException::~JSTestException();
 }
 
-JSTestException::~JSTestException()
+bool JSTestException::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
 {
-    releaseImplIfNotNull();
-}
-
-bool JSTestException::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    JSTestException* thisObject = jsCast<JSTestException*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    return getStaticValueSlot<JSTestException, Base>(exec, &JSTestExceptionTable, thisObject, propertyName, slot);
-}
-
-bool JSTestException::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSTestException* thisObject = jsCast<JSTestException*>(object);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    return getStaticValueDescriptor<JSTestException, Base>(exec, &JSTestExceptionTable, thisObject, propertyName, descriptor);
-}
-
-JSValue jsTestExceptionName(ExecState* exec, JSValue slotBase, PropertyName)
-{
-    JSTestException* castedThis = jsCast<JSTestException*>(asObject(slotBase));
-    UNUSED_PARAM(exec);
-    TestException* impl = static_cast<TestException*>(castedThis->impl());
-    JSValue result = jsStringWithCache(exec, impl->name());
-    return result;
-}
-
-
-JSValue jsTestExceptionConstructor(ExecState* exec, JSValue slotBase, PropertyName)
-{
-    JSTestException* domObject = jsCast<JSTestException*>(asObject(slotBase));
-    return JSTestException::getConstructor(exec, domObject->globalObject());
-}
-
-JSValue JSTestException::getConstructor(ExecState* exec, JSGlobalObject* globalObject)
-{
-    return getDOMConstructor<JSTestExceptionConstructor>(exec, jsCast<JSDOMGlobalObject*>(globalObject));
-}
-
-static inline bool isObservable(JSTestException* jsTestException)
-{
-    if (jsTestException->hasCustomProperties())
+    auto* thisObject = jsCast<JSTestException*>(object);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+    if (getStaticValueSlot<JSTestException, Base>(state, JSTestExceptionTable, thisObject, propertyName, slot))
         return true;
     return false;
 }
 
+EncodedJSValue jsTestExceptionName(ExecState* state, JSObject* slotBase, EncodedJSValue thisValue, PropertyName)
+{
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(slotBase);
+    UNUSED_PARAM(thisValue);
+    auto* castedThis = jsCast<JSTestException*>(slotBase);
+    auto& impl = castedThis->wrapped();
+    JSValue result = jsStringWithCache(state, impl.name());
+    return JSValue::encode(result);
+}
+
+
+EncodedJSValue jsTestExceptionConstructor(ExecState* state, JSObject* baseValue, EncodedJSValue, PropertyName)
+{
+    JSTestExceptionPrototype* domObject = jsDynamicCast<JSTestExceptionPrototype*>(baseValue);
+    if (!domObject)
+        return throwVMTypeError(state);
+    return JSValue::encode(JSTestException::getConstructor(state->vm(), domObject->globalObject()));
+}
+
+JSValue JSTestException::getConstructor(VM& vm, JSGlobalObject* globalObject)
+{
+    return getDOMConstructor<JSTestExceptionConstructor>(vm, *jsCast<JSDOMGlobalObject*>(globalObject));
+}
+
 bool JSTestExceptionOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
 {
-    JSTestException* jsTestException = jsCast<JSTestException*>(handle.get().asCell());
-    if (!isObservable(jsTestException))
-        return false;
+    UNUSED_PARAM(handle);
     UNUSED_PARAM(visitor);
     return false;
 }
 
 void JSTestExceptionOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    JSTestException* jsTestException = jsCast<JSTestException*>(handle.get().asCell());
-    DOMWrapperWorld* world = static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, jsTestException->impl(), jsTestException);
-    jsTestException->releaseImpl();
+    auto* jsTestException = jsCast<JSTestException*>(handle.slot()->asCell());
+    auto& world = *static_cast<DOMWrapperWorld*>(context);
+    uncacheWrapper(world, &jsTestException->wrapped(), jsTestException);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -185,11 +180,19 @@ extern "C" { extern void (*const __identifier("??_7TestException@WebCore@@6B@")[
 extern "C" { extern void* _ZTVN7WebCore13TestExceptionE[]; }
 #endif
 #endif
-JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestException* impl)
+
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestException* impl)
 {
     if (!impl)
         return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestException>(exec, impl))
+    return createNewWrapper<JSTestException>(globalObject, impl);
+}
+
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestException* impl)
+{
+    if (!impl)
+        return jsNull();
+    if (JSValue result = getExistingWrapper<JSTestException>(globalObject, impl))
         return result;
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -210,13 +213,14 @@ JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestExc
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    ReportMemoryCost<TestException>::reportMemoryCost(exec, impl);
-    return createNewWrapper<JSTestException>(exec, globalObject, impl);
+    return createNewWrapper<JSTestException>(globalObject, impl);
 }
 
-TestException* toTestException(JSC::JSValue value)
+TestException* JSTestException::toWrapped(JSC::JSValue value)
 {
-    return value.inherits(&JSTestException::s_info) ? jsCast<JSTestException*>(asObject(value))->impl() : 0;
+    if (auto* wrapper = jsDynamicCast<JSTestException*>(value))
+        return &wrapper->wrapped();
+    return nullptr;
 }
 
 }

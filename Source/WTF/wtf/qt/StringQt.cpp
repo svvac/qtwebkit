@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -60,14 +60,14 @@ String::operator QString() const
         return QString(qStringDataPointer);
     }
 
-    if (is8Bit() && !m_impl->has16BitShadow()) {
+    if (is8Bit()) {
         // Asking for characters() of an 8-bit string will make a 16-bit copy internally
         // in WTF::String. Since we're going to copy the data to QStringData anyways, we
         // can do the conversion ourselves and save one copy.
         return QString::fromLatin1(reinterpret_cast<const char*>(characters8()), length());
     }
 
-    return QString(reinterpret_cast<const QChar*>(characters()), length());
+    return QString(reinterpret_cast<const QChar*>(characters16()), length());
 }
 
 }

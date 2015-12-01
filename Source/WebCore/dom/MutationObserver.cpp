@@ -38,27 +38,17 @@
 #include "MutationCallback.h"
 #include "MutationObserverRegistration.h"
 #include "MutationRecord.h"
-#include "Node.h"
 #include <algorithm>
-#include <wtf/HashSet.h>
 #include <wtf/MainThread.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
 static unsigned s_observerPriority = 0;
 
-struct MutationObserver::ObserverLessThan {
-    bool operator()(const RefPtr<MutationObserver>& lhs, const RefPtr<MutationObserver>& rhs)
-    {
-        return lhs->m_priority < rhs->m_priority;
-    }
-};
-
-PassRefPtr<MutationObserver> MutationObserver::create(PassRefPtr<MutationCallback> callback)
+Ref<MutationObserver> MutationObserver::create(PassRefPtr<MutationCallback> callback)
 {
     ASSERT(isMainThread());
-    return adoptRef(new MutationObserver(callback));
+    return adoptRef(*new MutationObserver(callback));
 }
 
 MutationObserver::MutationObserver(PassRefPtr<MutationCallback> callback)
@@ -92,22 +82,28 @@ void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, 
         MutationObserverOptions value;
     } booleanOptions[] = {
         { "childList", ChildList },
-        { "attributes", Attributes },
-        { "characterData", CharacterData },
         { "subtree", Subtree },
         { "attributeOldValue", AttributeOldValue },
         { "characterDataOldValue", CharacterDataOldValue }
     };
     MutationObserverOptions options = 0;
-    for (unsigned i = 0; i < sizeof(booleanOptions) / sizeof(booleanOptions[0]); ++i) {
-        bool value = false;
-        if (optionsDictionary.get(booleanOptions[i].name, value) && value)
-            options |= booleanOptions[i].value;
+    bool value = false;
+    for (auto& booleanOption : booleanOptions) {
+        if (optionsDictionary.get(booleanOption.name, value) && value)
+            options |= booleanOption.value;
     }
 
     HashSet<AtomicString> attributeFilter;
     if (optionsDictionary.get("attributeFilter", attributeFilter))
         options |= AttributeFilter;
+
+    bool attributesOptionIsSet = optionsDictionary.get("attributes", value);
+    if ((attributesOptionIsSet && value) || (!attributesOptionIsSet && (options & (AttributeFilter | AttributeOldValue))))
+        options |= Attributes;
+
+    bool characterDataOptionIsSet = optionsDictionary.get("characterData", value);
+    if ((characterDataOptionIsSet && value) || (!characterDataOptionIsSet && (options & CharacterDataOldValue)))
+        options |= CharacterData;
 
     if (!validateOptions(options)) {
         ec = SYNTAX_ERR;
@@ -117,9 +113,9 @@ void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, 
     node->registerMutationObserver(this, options, attributeFilter);
 }
 
-Vector<RefPtr<MutationRecord> > MutationObserver::takeRecords()
+Vector<RefPtr<MutationRecord>> MutationObserver::takeRecords()
 {
-    Vector<RefPtr<MutationRecord> > records;
+    Vector<RefPtr<MutationRecord>> records;
     records.swap(m_records);
     return records;
 }
@@ -128,8 +124,8 @@ void MutationObserver::disconnect()
 {
     m_records.clear();
     HashSet<MutationObserverRegistration*> registrations(m_registrations);
-    for (HashSet<MutationObserverRegistration*>::iterator iter = registrations.begin(); iter != registrations.end(); ++iter)
-        MutationObserverRegistration::unregisterAndDelete(*iter);
+    for (auto* registration : registrations)
+        MutationObserverRegistration::unregisterAndDelete(registration);
 }
 
 void MutationObserver::observationStarted(MutationObserverRegistration* registration)
@@ -144,17 +140,17 @@ void MutationObserver::observationEnded(MutationObserverRegistration* registrati
     m_registrations.remove(registration);
 }
 
-typedef HashSet<RefPtr<MutationObserver> > MutationObserverSet;
+typedef HashSet<RefPtr<MutationObserver>> MutationObserverSet;
 
 static MutationObserverSet& activeMutationObservers()
 {
-    DEFINE_STATIC_LOCAL(MutationObserverSet, activeObservers, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(MutationObserverSet, activeObservers, ());
     return activeObservers;
 }
 
 static MutationObserverSet& suspendedMutationObservers()
 {
-    DEFINE_STATIC_LOCAL(MutationObserverSet, suspendedObservers, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(MutationObserverSet, suspendedObservers, ());
     return suspendedObservers;
 }
 
@@ -174,8 +170,8 @@ void MutationObserver::setHasTransientRegistration()
 HashSet<Node*> MutationObserver::getObservedNodes() const
 {
     HashSet<Node*> observedNodes;
-    for (HashSet<MutationObserverRegistration*>::const_iterator iter = m_registrations.begin(); iter != m_registrations.end(); ++iter)
-        (*iter)->addRegistrationNodesToSet(observedNodes);
+    for (auto* registration : m_registrations)
+        registration->addRegistrationNodesToSet(observedNodes);
     return observedNodes;
 }
 
@@ -191,17 +187,17 @@ void MutationObserver::deliver()
     // Calling clearTransientRegistrations() can modify m_registrations, so it's necessary
     // to make a copy of the transient registrations before operating on them.
     Vector<MutationObserverRegistration*, 1> transientRegistrations;
-    for (HashSet<MutationObserverRegistration*>::iterator iter = m_registrations.begin(); iter != m_registrations.end(); ++iter) {
-        if ((*iter)->hasTransientRegistrations())
-            transientRegistrations.append(*iter);
+    for (auto* registration : m_registrations) {
+        if (registration->hasTransientRegistrations())
+            transientRegistrations.append(registration);
     }
-    for (size_t i = 0; i < transientRegistrations.size(); ++i)
-        transientRegistrations[i]->clearTransientRegistrations();
+    for (auto& registration : transientRegistrations)
+        registration->clearTransientRegistrations();
 
     if (m_records.isEmpty())
         return;
 
-    Vector<RefPtr<MutationRecord> > records;
+    Vector<RefPtr<MutationRecord>> records;
     records.swap(m_records);
 
     m_callback->call(records, this);
@@ -216,27 +212,30 @@ void MutationObserver::deliverAllMutations()
     deliveryInProgress = true;
 
     if (!suspendedMutationObservers().isEmpty()) {
-        Vector<RefPtr<MutationObserver> > suspended;
+        Vector<RefPtr<MutationObserver>> suspended;
         copyToVector(suspendedMutationObservers(), suspended);
-        for (size_t i = 0; i < suspended.size(); ++i) {
-            if (!suspended[i]->canDeliver())
+        for (auto& observer : suspended) {
+            if (!observer->canDeliver())
                 continue;
 
-            suspendedMutationObservers().remove(suspended[i]);
-            activeMutationObservers().add(suspended[i]);
+            suspendedMutationObservers().remove(observer);
+            activeMutationObservers().add(observer);
         }
     }
 
     while (!activeMutationObservers().isEmpty()) {
-        Vector<RefPtr<MutationObserver> > observers;
+        Vector<RefPtr<MutationObserver>> observers;
         copyToVector(activeMutationObservers(), observers);
         activeMutationObservers().clear();
-        std::sort(observers.begin(), observers.end(), ObserverLessThan());
-        for (size_t i = 0; i < observers.size(); ++i) {
-            if (observers[i]->canDeliver())
-                observers[i]->deliver();
+        std::sort(observers.begin(), observers.end(), [](const RefPtr<MutationObserver>& lhs, const RefPtr<MutationObserver>& rhs) {
+            return lhs->m_priority < rhs->m_priority;
+        });
+
+        for (auto& observer : observers) {
+            if (observer->canDeliver())
+                observer->deliver();
             else
-                suspendedMutationObservers().add(observers[i]);
+                suspendedMutationObservers().add(observer);
         }
     }
 

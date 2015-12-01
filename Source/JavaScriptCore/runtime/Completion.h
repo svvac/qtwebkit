@@ -24,18 +24,38 @@
 #define Completion_h
 
 #include "JSCJSValue.h"
+#include <wtf/NakedPtr.h>
 
 namespace JSC {
-    
-    struct ParserError;
-    class ExecState;
-    class JSScope;
-    class SourceCode;
-    class VM;
 
-    JS_EXPORT_PRIVATE bool checkSyntax(VM&, const SourceCode&, ParserError&);
-    JS_EXPORT_PRIVATE bool checkSyntax(ExecState*, const SourceCode&, JSValue* exception = 0);
-    JS_EXPORT_PRIVATE JSValue evaluate(ExecState*, const SourceCode&, JSValue thisValue = JSValue(), JSValue* exception = 0);
+class Exception;
+class ExecState;
+class JSScope;
+class ParserError;
+class SourceCode;
+class VM;
+class JSInternalPromise;
+
+JS_EXPORT_PRIVATE bool checkSyntax(VM&, const SourceCode&, ParserError&);
+JS_EXPORT_PRIVATE bool checkSyntax(ExecState*, const SourceCode&, JSValue* exception = 0);
+JS_EXPORT_PRIVATE bool checkModuleSyntax(ExecState*, const SourceCode&, ParserError&);
+JS_EXPORT_PRIVATE JSValue evaluate(ExecState*, const SourceCode&, JSValue thisValue, NakedPtr<Exception>& returnedException);
+inline JSValue evaluate(ExecState* exec, const SourceCode& sourceCode, JSValue thisValue = JSValue())
+{
+    NakedPtr<Exception> unused;
+    return evaluate(exec, sourceCode, thisValue, unused);
+}
+
+// Load the module source and evaluate it.
+JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const String& moduleName);
+JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const SourceCode&);
+
+// Fetch the module source, and instantiate the module record.
+JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const String& moduleName);
+JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const SourceCode&);
+
+// Link and evaluate the already linked module.
+JS_EXPORT_PRIVATE JSInternalPromise* linkAndEvaluateModule(ExecState*, const Identifier& moduleKey);
 
 } // namespace JSC
 

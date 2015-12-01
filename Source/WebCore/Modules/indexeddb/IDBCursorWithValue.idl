@@ -25,7 +25,8 @@
 
 [
     Conditional=INDEXED_DATABASE,
-    JSNoStaticTables
+    EnabledAtRuntime=IndexedDB,
+    SkipVTableValidation,
 ] interface IDBCursorWithValue : IDBCursor {
     readonly attribute any value;
 };

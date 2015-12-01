@@ -32,7 +32,6 @@
 #include <wtf/MetaAllocatorHandle.h>
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageAllocation.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
@@ -40,7 +39,7 @@
 #include <libkern/OSCacheControl.h>
 #endif
 
-#if OS(IOS) || OS(QNX)
+#if OS(IOS)
 #include <sys/mman.h>
 #endif
 
@@ -55,43 +54,15 @@
 #include <unistd.h>
 #endif
 
-#if OS(WINCE)
-// From pkfuncs.h (private header file from the Platform Builder)
-#define CACHE_SYNC_ALL 0x07F
-extern "C" __declspec(dllimport) void CacheRangeFlush(LPVOID pAddr, DWORD dwLength, DWORD dwFlags);
-#endif
-
 #define JIT_ALLOCATOR_LARGE_ALLOC_SIZE (pageSize() * 4)
 
-#if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
-#define PROTECTION_FLAGS_RW (PROT_READ | PROT_WRITE)
-#define PROTECTION_FLAGS_RX (PROT_READ | PROT_EXEC)
-#define EXECUTABLE_POOL_WRITABLE false
-#else
 #define EXECUTABLE_POOL_WRITABLE true
-#endif
 
 namespace JSC {
 
 class VM;
-void releaseExecutableMemory(VM&);
 
 static const unsigned jitAllocationGranule = 32;
-
-inline size_t roundUpAllocationSize(size_t request, size_t granularity)
-{
-    RELEASE_ASSERT((std::numeric_limits<size_t>::max() - granularity) > request);
-    
-    // Round up to next page boundary
-    size_t size = request + (granularity - 1);
-    size = size & ~(granularity - 1);
-    ASSERT(size >= request);
-    return size;
-}
-
-}
-
-namespace JSC {
 
 typedef WTF::MetaAllocatorHandle ExecutableMemoryHandle;
 
@@ -102,13 +73,16 @@ class DemandExecutableAllocator;
 #endif
 
 #if ENABLE(EXECUTABLE_ALLOCATOR_FIXED)
-#if CPU(ARM) || CPU(MIPS)
+#if CPU(ARM)
 static const size_t fixedExecutableMemoryPoolSize = 16 * 1024 * 1024;
-#elif CPU(X86_64) && !CPU(X32)
+#elif CPU(ARM64)
+static const size_t fixedExecutableMemoryPoolSize = 32 * 1024 * 1024;
+#elif CPU(X86_64)
 static const size_t fixedExecutableMemoryPoolSize = 1024 * 1024 * 1024;
 #else
 static const size_t fixedExecutableMemoryPoolSize = 32 * 1024 * 1024;
 #endif
+static const double executablePoolReservationFraction = 0.25;
 
 extern uintptr_t startOfFixedExecutableMemoryPool;
 #endif
@@ -134,36 +108,9 @@ public:
     static void dumpProfile() { }
 #endif
 
-    PassRefPtr<ExecutableMemoryHandle> allocate(VM&, size_t sizeInBytes, void* ownerUID, JITCompilationEffort);
-
-#if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
-    static void makeWritable(void* start, size_t size)
-    {
-        reprotectRegion(start, size, Writable);
-    }
-
-    static void makeExecutable(void* start, size_t size)
-    {
-        reprotectRegion(start, size, Executable);
-    }
-#else
-    static void makeWritable(void*, size_t) {}
-    static void makeExecutable(void*, size_t) {}
-#endif
+    RefPtr<ExecutableMemoryHandle> allocate(VM&, size_t sizeInBytes, void* ownerUID, JITCompilationEffort);
 
     static size_t committedByteCount();
-
-private:
-
-#if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
-    static void reprotectRegion(void*, size_t, ProtectionSetting);
-#if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND)
-    // We create a MetaAllocator for each JS global object.
-    OwnPtr<DemandExecutableAllocator> m_allocator;
-    DemandExecutableAllocator* allocator() { return m_allocator.get(); }
-#endif
-#endif
-
 };
 
 #endif // ENABLE(JIT) && ENABLE(ASSEMBLER)

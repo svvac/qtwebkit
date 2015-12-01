@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,61 +32,67 @@
 #ifndef WorkerInspectorController_h
 #define WorkerInspectorController_h
 
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
-
-#include "InspectorBaseAgent.h"
-#include <wtf/FastAllocBase.h>
+#include "InspectorInstrumentationCookie.h"
+#include "InspectorWebAgentBase.h"
+#include "WorkerScriptDebugServer.h"
+#include <inspector/InspectorAgentRegistry.h>
+#include <inspector/InspectorEnvironment.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
+
+namespace Inspector {
+class FrontendChannel;
+class FrontendRouter;
+};
 
 namespace WebCore {
 
-class InjectedScriptManager;
-class InspectorBackendDispatcher;
-class InspectorFrontend;
-class InspectorFrontendChannel;
 class InspectorInstrumentation;
-class InspectorRuntimeAgent;
-class InspectorState;
-class InspectorStateClient;
 class InstrumentingAgents;
+class WebInjectedScriptManager;
 class WorkerGlobalScope;
+class WorkerRuntimeAgent;
 
-class WorkerInspectorController {
+class WorkerInspectorController final : public Inspector::InspectorEnvironment {
     WTF_MAKE_NONCOPYABLE(WorkerInspectorController);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    WorkerInspectorController(WorkerGlobalScope*);
-    ~WorkerInspectorController();
+    explicit WorkerInspectorController(WorkerGlobalScope&);
+    virtual ~WorkerInspectorController();
 
-    bool hasFrontend() const { return m_frontend; }
     void connectFrontend();
-    void disconnectFrontend();
-    void restoreInspectorStateFromCookie(const String& inspectorCookie);
+    void disconnectFrontend(Inspector::DisconnectReason);
     void dispatchMessageFromFrontend(const String&);
-#if ENABLE(JAVASCRIPT_DEBUGGER)
     void resume();
-#endif
+
+    virtual bool developerExtrasEnabled() const override { return true; }
+    virtual bool canAccessInspectedScriptState(JSC::ExecState*) const override { return true; }
+    virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const override;
+    virtual Inspector::InspectorEvaluateHandler evaluateHandler() const override;
+    virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) override;
+    virtual void didCallInjectedScriptFunction(JSC::ExecState*) override;
+    virtual void frontendInitialized() override { }
+    virtual Ref<WTF::Stopwatch> executionStopwatch() override;
+    virtual WorkerScriptDebugServer& scriptDebugServer() override;
+    virtual JSC::VM& vm() override;
 
 private:
-    friend InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope*);
+    friend class InspectorInstrumentation;
 
-    WorkerGlobalScope* m_workerGlobalScope;
-    OwnPtr<InspectorStateClient> m_stateClient;
-    OwnPtr<InspectorCompositeState> m_state;
-    RefPtr<InstrumentingAgents> m_instrumentingAgents;
-    OwnPtr<InjectedScriptManager> m_injectedScriptManager;
-    InspectorRuntimeAgent* m_runtimeAgent;
-    InspectorAgentRegistry m_agents;
-    OwnPtr<InspectorFrontendChannel> m_frontendChannel;
-    OwnPtr<InspectorFrontend> m_frontend;
-    RefPtr<InspectorBackendDispatcher> m_backendDispatcher;
+    WorkerGlobalScope& m_workerGlobalScope;
+    Ref<InstrumentingAgents> m_instrumentingAgents;
+    std::unique_ptr<WebInjectedScriptManager> m_injectedScriptManager;
+    WorkerRuntimeAgent* m_runtimeAgent { nullptr };
+    Inspector::AgentRegistry m_agents;
+    std::unique_ptr<Inspector::FrontendChannel> m_forwardingChannel;
+    Ref<WTF::Stopwatch> m_executionStopwatch;
+    WorkerScriptDebugServer m_scriptDebugServer;
+    Ref<Inspector::FrontendRouter> m_frontendRouter;
+    Ref<Inspector::BackendDispatcher> m_backendDispatcher;
+    Vector<InspectorInstrumentationCookie, 2> m_injectedScriptInstrumentationCookies;
 };
 
 }
-
-#endif // ENABLE(WORKERS)
 
 #endif // !defined(WorkerInspectorController_h)

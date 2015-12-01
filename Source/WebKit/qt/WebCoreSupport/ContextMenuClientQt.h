@@ -32,20 +32,21 @@
 
 namespace WebCore {
 class ContextMenu;
+class ContextMenuItem;
 
 class ContextMenuClientQt : public ContextMenuClient {
 public:
     virtual void contextMenuDestroyed();
 
-    virtual PassOwnPtr<ContextMenu> customizeMenu(PassOwnPtr<ContextMenu>);
     virtual void contextMenuItemSelected(ContextMenuItem*, const ContextMenu*);
 
-    virtual void downloadURL(const KURL&);
+    virtual void downloadURL(const URL&);
     virtual void lookUpInDictionary(Frame*);
     virtual void speak(const String&);
     virtual bool isSpeaking();
     virtual void stopSpeaking();
     virtual void searchWithGoogle(const Frame*);
+    virtual ContextMenuItem shareMenuItem(const HitTestResult&);
 };
 }
 

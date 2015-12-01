@@ -12,38 +12,127 @@ CONFIG += staticlib optimize_full
 
 VPATH += $$PWD/wtf
 
-INCLUDEPATH += $$PWD/wtf
-
-wince* {
-    # for mt19937ar.c
-    INCLUDEPATH += $${ROOT_WEBKIT_DIR}/Source/ThirdParty
-}
+INCLUDEPATH += $$PWD/wtf \
+    $$PWD/wtf/dtoa \
+    $$PWD/wtf/text \
+    $$PWD/wtf/threads \
+    $$PWD/wtf/unicode
 
 HEADERS += \
-    Alignment.h \
-    ArrayBuffer.h \
-    ArrayBufferView.h \
     ASCIICType.h \
     Assertions.h \
     Atomics.h \
-    AVLTree.h \
-    Bitmap.h \
-    BitArray.h \
+    Bag.h \
+    BagToHashMap.h \
     BitVector.h \
-    BloomFilter.h \
-    BoundsCheckedPointer.h \
+    Bitmap.h \
+    BubbleSort.h \
     BumpPointerAllocator.h \
     ByteOrder.h \
-    CheckedArithmetic.h \
+    CompilationThread.h \
     Compiler.h \
+    Condition.h \
+    CryptographicUtilities.h \
     CryptographicallyRandomNumber.h \
     CurrentTime.h \
+    DataLog.h \
     DateMath.h \
+    Dominators.h \
     DecimalNumber.h \
-    Decoder.h \
-    DataLog.h \ 
+    DeferrableRefCounted.h \
     Deque.h \
     DisallowCType.h \
+    DoublyLinkedList.h \
+    FastMalloc.h \
+    FeatureDefines.h \
+    FilePrintStream.h \
+    FlipBytes.h \
+    Forward.h \
+    FunctionDispatcher.h \
+    Functional.h \
+    GetPtr.h \
+    GraphNodeWorklist.h \
+    GregorianDateTime.h \
+    HashCountedSet.h \
+    Hasher.h \
+    HashFunctions.h \
+    HashIterators.h \
+    HashMap.h \
+    HashMethod.h \
+    HashSet.h \
+    HashTable.h \
+    HashTraits.h \
+    HexNumber.h \
+    IteratorAdaptors.h \
+    IteratorRange.h \
+    ListHashSet.h \
+    Lock.h \
+    Locker.h \
+    MD5.h \
+    MainThread.h \
+    MallocPtr.h \
+    MathExtras.h \
+    MediaTime.h \
+    MessageQueue.h \
+    MetaAllocator.h \
+    MetaAllocatorHandle.h \
+    Noncopyable.h \
+    NumberOfCores.h \
+    OSAllocator.h \
+    OSRandomSource.h \
+    PageAllocation.h \
+    PageBlock.h \
+    PageReservation.h \
+    ParallelHelperPool.h \
+    ParallelJobs.h \
+    ParallelJobsGeneric.h \
+    ParallelJobsLibdispatch.h \
+    ParallelJobsOpenMP.h \
+    ParallelVectorIterator.h \
+    ParkingLot.h \
+    PassRefPtr.h \
+    Platform.h \
+    PrintStream.h \
+    ProcessID.h \
+    RAMSize.h \
+    RandomNumber.h \
+    RandomNumberSeed.h \
+    RawPointer.h \
+    RedBlackTree.h \
+    Ref.h \
+    RefCounted.h \
+    RefCountedLeakCounter.h \
+    RefCounter.h \
+    RefPtr.h \
+    RetainPtr.h \
+    RunLoop.h \
+    SHA1.h \
+    SharedTask.h \
+    SaturatedArithmetic.h \
+    ScopedLambda.h \
+    SegmentedVector.h \
+    StackBounds.h \
+    StackStats.h \
+    StaticConstructors.h \
+    StdLibExtras.h \
+    Stopwatch.h \
+    StringExtras.h \
+    StringPrintStream.h \
+    ThreadIdentifierDataPthreads.h \
+    ThreadSafeRefCounted.h \
+    ThreadSpecific.h \
+    Threading.h \
+    ThreadingPrimitives.h \
+    TinyPtrSet.h \
+    VMTags.h \
+    ValueCheck.h \
+    Vector.h \
+    VectorTraits.h \
+    WTFThreadData.h \
+    WeakPtr.h \
+    WordLock.h \
+    WorkQueue.h \
+    \
     dtoa.h \
     dtoa/bignum-dtoa.h \
     dtoa/bignum.h \
@@ -55,145 +144,75 @@ HEADERS += \
     dtoa/fixed-dtoa.h \
     dtoa/strtod.h \
     dtoa/utils.h \
-    DynamicAnnotations.h \
-    Encoder.h \
-    EnumClass.h \
-    ExportMacros.h \
-    FastAllocBase.h \
-    FastMalloc.h \
-    FeatureDefines.h \
-    FilePrintStream.h \
-    FixedArray.h \
-    Float32Array.h \
-    Float64Array.h \
-    Forward.h \
-    FunctionDispatcher.h \
-    Functional.h \
-    GetPtr.h \
-    GregorianDateTime.h \
-    HashCountedSet.h \
-    HashFunctions.h \
-    HashIterators.h \
-    HashMap.h \
-    HashSet.h \
-    HashTable.h \
-    HashTraits.h \
-    HexNumber.h \
-    Int16Array.h \
-    Int32Array.h \
-    Int8Array.h \
-    ListHashSet.h \
-    Locker.h \
-    MainThread.h \
-    MathExtras.h \
-    MD5.h \
-    MediaTime.h \
-    MessageQueue.h \
-    MetaAllocator.h \
-    MetaAllocatorHandle.h \
-    Noncopyable.h \
-    NonCopyingSort.h \
-    NotFound.h \
-    NullPtr.h \
-    NumberOfCores.h \
-    RAMSize.h \
-    OSAllocator.h \
-    OSRandomSource.h \
-    OwnArrayPtr.h \
-    OwnPtr.h \
-    OwnPtrCommon.h \
-    PackedIntVector.h \
-    PageAllocation.h \
-    PageAllocationAligned.h \
-    PageBlock.h \
-    PageReservation.h \
-    ParallelJobs.h \
-    ParallelJobsGeneric.h \
-    ParallelJobsLibdispatch.h \
-    ParallelJobsOpenMP.h \
-    PassOwnArrayPtr.h \
-    PassOwnPtr.h \
-    PassRefPtr.h \
-    PassTraits.h \
-    Platform.h \
-    PossiblyNull.h \
-    PrintStream.h \
-    ProcessID.h \
-    RandomNumber.h \
-    RandomNumberSeed.h \
-    RawPointer.h \
-    RedBlackTree.h \
-    RefCounted.h \
-    RefCountedLeakCounter.h \
-    RefPtr.h \
-    RefPtrHashMap.h \
-    RetainPtr.h \
-    SHA1.h \
-    SaturatedArithmetic.h \
-    Spectrum.h \
-    StackBounds.h \
-    StaticConstructors.h \
-    StdLibExtras.h \
-    StringExtras.h \
-    StringHasher.h \
-    StringPrintStream.h \
-    TCPackedCache.h \
-    TCSpinLock.h \
-    TCSystemAlloc.h \
-    text/ASCIIFastPath.h \
+    \
     text/AtomicString.h \
-    text/AtomicStringHash.h \
     text/AtomicStringImpl.h \
     text/AtomicStringTable.h \
     text/Base64.h \
     text/CString.h \
     text/IntegerToStringConversion.h \
+    text/LChar.h \
     text/StringBuffer.h \
-    text/StringBuilder.h \
-    text/StringConcatenate.h \
+    text/StringCommon.h \
     text/StringHash.h \
     text/StringImpl.h \
-    text/StringOperators.h \
-    text/TextPosition.h \
+    text/StringView.h \
+    text/SymbolImpl.h \
+    text/SymbolRegistry.h \
+    text/UniquedStringImpl.h \
     text/WTFString.h \
+    \
     threads/BinarySemaphore.h \
-    Threading.h \
-    ThreadingPrimitives.h \
-    ThreadRestrictionVerifier.h \
-    ThreadSafeRefCounted.h \
-    ThreadSpecific.h \
-    TypeTraits.h \
-    Uint16Array.h \
-    Uint32Array.h \
-    Uint8Array.h \
-    Uint8ClampedArray.h \
+    \
     unicode/CharacterNames.h \
     unicode/Collator.h \
-    unicode/icu/UnicodeIcu.h \
-    unicode/ScriptCodesFromICU.h \
-    unicode/Unicode.h \
-    unicode/UnicodeMacrosFromICU.h \
-    unicode/UTF8.h \
-    ValueCheck.h \
-    Vector.h \
-    VectorTraits.h \
-    VMTags.h \
-    WTFThreadData.h \
-    WeakPtr.h
-
-unix: HEADERS += ThreadIdentifierDataPthreads.h
+    unicode/UTF8.h
 
 SOURCES += \
-    ArrayBuffer.cpp \
-    ArrayBufferView.cpp \
     Assertions.cpp \
+    Atomics.cpp \
     BitVector.cpp \
+    CompilationThread.cpp \
+    CryptographicUtilities.cpp \
     CryptographicallyRandomNumber.cpp \
     CurrentTime.cpp \
-    DateMath.cpp \
     DataLog.cpp \
+    DateMath.cpp \
     DecimalNumber.cpp \
+    FastBitVector.cpp \
+    FastMalloc.cpp \
+    FilePrintStream.cpp \
+    FunctionDispatcher.cpp \
+    GregorianDateTime.cpp \
+    HashTable.cpp \
+    Lock.cpp \
+    MD5.cpp \
+    MainThread.cpp \
+    MediaTime.cpp \
+    MetaAllocator.cpp \
+    NumberOfCores.cpp \
+    OSRandomSource.cpp \
+    PageBlock.cpp \
+    ParallelHelperPool.cpp \
+    ParallelJobsGeneric.cpp \
+    ParkingLot.cpp \
+    PrintStream.cpp \
+    RAMSize.cpp \
+    RandomNumber.cpp \
+    RefCountedLeakCounter.cpp \
+    RefCounter.cpp \
+    RunLoop.cpp \
+    SHA1.cpp \
+    SixCharacterHash.cpp \
+    StackBounds.cpp \
+    StackStats.cpp \
+    StringPrintStream.cpp \
+    Threading.cpp \
+    WTFThreadData.cpp \
+    WordLock.cpp \
+    WorkQueue.cpp \
     dtoa.cpp \
+    \
     dtoa/bignum-dtoa.cc \
     dtoa/bignum.cc \
     dtoa/cached-powers.cc \
@@ -202,71 +221,42 @@ SOURCES += \
     dtoa/fast-dtoa.cc \
     dtoa/fixed-dtoa.cc \
     dtoa/strtod.cc \
-    FastMalloc.cpp \
-    FilePrintStream.cpp \
-    FunctionDispatcher.cpp \
-    GregorianDateTime.cpp \
-    gobject/GOwnPtr.cpp \
-    gobject/GRefPtr.cpp \
-    HashTable.cpp \
-    MD5.cpp \
-    MainThread.cpp \
-    MediaTime.cpp \
-    MetaAllocator.cpp \
-    NullPtr.cpp \
-    NumberOfCores.cpp \
-    RAMSize.cpp \
-    OSRandomSource.cpp \
+    \
     qt/MainThreadQt.cpp \
+    qt/RunLoopQt.cpp \
     qt/StringQt.cpp \
-    PageAllocationAligned.cpp \
-    PageBlock.cpp \
-    ParallelJobsGeneric.cpp \
-    PrintStream.cpp \
-    RandomNumber.cpp \
-    RefCountedLeakCounter.cpp \
-    SHA1.cpp \
-    StackBounds.cpp \
-    StringPrintStream.cpp \
-    TCSystemAlloc.cpp \
-    Threading.cpp \
-    TypeTraits.cpp \
-    WTFThreadData.cpp \
+    qt/WorkQueueQt.cpp \
+    \
     text/AtomicString.cpp \
+    text/AtomicStringImpl.cpp \
     text/AtomicStringTable.cpp \
     text/Base64.cpp \
     text/CString.cpp \
     text/StringBuilder.cpp \
     text/StringImpl.cpp \
     text/StringStatics.cpp \
+    text/StringView.cpp \
+    text/SymbolRegistry.cpp \
     text/WTFString.cpp \
-    unicode/CollatorDefault.cpp \
-    unicode/icu/CollatorICU.cpp \
-    unicode/UTF8.cpp
+    \
+    threads/BinarySemaphore.cpp \
+    \
+    unicode/UTF8.cpp \
+    \
+    unicode/icu/CollatorICU.cpp
 
 unix: SOURCES += \
+    mbmalloc.cpp \
     OSAllocatorPosix.cpp \
     ThreadIdentifierDataPthreads.cpp \
     ThreadingPthreads.cpp
 
-win*|wince*: SOURCES += \
-    win/OwnPtrWin.cpp \
+win*: SOURCES += \
     OSAllocatorWin.cpp \
     ThreadSpecificWin.cpp \
     ThreadingWin.cpp
 
-win32 {
-    SOURCES += \
-        threads/win/BinarySemaphoreWin.cpp
-    INCLUDEPATH += $$PWD/wtf/threads
-} else {
-    SOURCES += \
-        threads/BinarySemaphore.cpp
-}
-
-use?(wchar_unicode): SOURCES += wtf/unicode/wchar/UnicodeWchar.cpp
-
-QT += core
+QT += core network
 QT -= gui
 
 *sh4* {

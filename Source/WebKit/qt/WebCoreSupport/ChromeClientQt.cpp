@@ -74,7 +74,6 @@
 #include <qeventloop.h>
 #include <qwindow.h>
 #include <wtf/CurrentTime.h>
-#include <wtf/OwnPtr.h>
 
 #if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
 #include "FullScreenVideoQt.h"
@@ -212,8 +211,7 @@ void ChromeClientQt::takeFocus(FocusDirection)
     // here.
 }
 
-
-void ChromeClientQt::focusedNodeChanged(Node*)
+void ChromeClientQt::focusedElementChanged(Element*)
 {
 }
 
@@ -308,16 +306,12 @@ void ChromeClientQt::setResizable(bool)
     notImplemented();
 }
 
-void ChromeClientQt::addMessageToConsole(MessageSource, MessageLevel level, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID, const String& stack)
+void ChromeClientQt::addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID)
 {
     QString x = message;
     QString y = sourceID;
     UNUSED_PARAM(columnNumber);
-    if (level == ErrorMessageLevel) {
-        m_webPage->javaScriptError(x, lineNumber, y, stack);
-    } else {
-        m_webPage->javaScriptConsoleMessage(x, lineNumber, y);
-    }
+    m_webPage->javaScriptConsoleMessage(x, lineNumber, y);
 }
 
 void ChromeClientQt::chromeDestroyed()
@@ -338,7 +332,7 @@ bool ChromeClientQt::runBeforeUnloadConfirmPanel(const String& message, Frame* f
 void ChromeClientQt::closeWindowSoon()
 {
     m_webPage->page->setGroupName(String());
-    m_webPage->page->mainFrame()->loader()->stopAllLoaders();
+    //m_webPage->page->mainFrame().loader()->stopAllLoaders();
     QMetaObject::invokeMethod(m_webPage->handle(), "windowCloseRequested");
 }
 
@@ -512,7 +506,7 @@ PlatformPageClient ChromeClientQt::platformPageClient() const
 
 void ChromeClientQt::contentsSizeChanged(Frame* frame, const IntSize& size) const
 {
-    if (frame->loader()->networkingContext())
+    if (frame->loader().networkingContext())
         QWebFrameAdapter::kit(frame)->contentsSizeDidChange(size);
 }
 
@@ -545,8 +539,8 @@ void ChromeClientQt::exceededDatabaseQuota(Frame* frame, const String& databaseN
 {
     quint64 quota = QWebSettings::offlineStorageDefaultQuota();
 
-    if (!DatabaseManager::manager().hasEntryForOrigin(frame->document()->securityOrigin()))
-        DatabaseManager::manager().setQuota(frame->document()->securityOrigin(), quota);
+    if (!DatabaseManager::singleton().hasEntryForOrigin(frame->document()->securityOrigin()))
+        DatabaseManager::singleton().setQuota(frame->document()->securityOrigin(), quota);
 
     m_webPage->databaseQuotaExceeded(QWebFrameAdapter::kit(frame), databaseName);
 }
@@ -560,6 +554,8 @@ void ChromeClientQt::reachedMaxAppCacheSize(int64_t)
 
 void ChromeClientQt::reachedApplicationCacheOriginQuota(SecurityOrigin* origin, int64_t totalSpaceNeeded)
 {
+    notImplemented();
+    /*
     int64_t quota;
     quint64 defaultOriginQuota = WebCore::cacheStorage().defaultOriginQuota();
 
@@ -570,10 +566,11 @@ void ChromeClientQt::reachedApplicationCacheOriginQuota(SecurityOrigin* origin, 
         WebCore::cacheStorage().storeUpdatedQuotaForOrigin(origin, defaultOriginQuota);
 
     m_webPage->applicationCacheQuotaExceeded(securityOrigin, defaultOriginQuota, static_cast<quint64>(totalSpaceNeeded));
+    */
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassOwnPtr<ColorChooser> ChromeClientQt::createColorChooser(ColorChooserClient* client, const Color& color)
+std::unique_ptr<ColorChooser> ChromeClientQt::createColorChooser(ColorChooserClient* client, const Color& color)
 {
     const QColor selectedColor = m_webPage->colorSelectionRequested(QColor(color));
     client->didChooseColor(selectedColor);
@@ -625,7 +622,7 @@ void ChromeClientQt::setCursor(const Cursor& cursor)
 void ChromeClientQt::scheduleAnimation()
 {
     if (!m_refreshAnimation)
-        m_refreshAnimation = adoptPtr(new RefreshAnimation(this));
+        m_refreshAnimation = std::make_unique<RefreshAnimation>(this);
     m_refreshAnimation->scheduleAnimation();
 }
 
@@ -717,14 +714,16 @@ void ChromeClientQt::exitFullscreenForNode(Node* node)
 } 
 #endif
 
-PassOwnPtr<QWebSelectMethod> ChromeClientQt::createSelectPopup() const
+std::unique_ptr<QWebSelectMethod> ChromeClientQt::createSelectPopup() const
 {
-    OwnPtr<QWebSelectMethod> result = m_platformPlugin.createSelectInputMethod();
+    std::unique_ptr<QWebSelectMethod> result = m_platformPlugin.createSelectInputMethod();
     if (result)
-        return result.release();
+        return result;
 
 #if !defined(QT_NO_COMBOBOX)
-    return adoptPtr(m_webPage->createSelectPopup());
+    notImplemented();
+    return nullptr;
+    //return std::make_unique<QWebSelectMethod>(m_webPage->createSelectPopup());
 #else
     return nullptr;
 #endif
@@ -761,12 +760,12 @@ bool ChromeClientQt::hasOpenedPopup() const
     return false;
 }
 
-PassRefPtr<PopupMenu> ChromeClientQt::createPopupMenu(PopupMenuClient* client) const
+RefPtr<PopupMenu> ChromeClientQt::createPopupMenu(PopupMenuClient* client) const
 {
     return adoptRef(new PopupMenuQt(client, this));
 }
 
-PassRefPtr<SearchPopupMenu> ChromeClientQt::createSearchPopupMenu(PopupMenuClient* client) const
+RefPtr<SearchPopupMenu> ChromeClientQt::createSearchPopupMenu(PopupMenuClient* client) const
 {
     return adoptRef(new SearchPopupMenuQt(createPopupMenu(client)));
 }
@@ -779,6 +778,46 @@ void ChromeClientQt::populateVisitedLinks()
         printf("Asked to populate visited links for WebView \"%s\"\n",
             qPrintable(QUrl(m_webPage->mainFrameAdapter()->url).toString()));
     }
+}
+
+void ChromeClientQt::invalidateRootView(const IntRect&)
+{
+    notImplemented();
+}
+
+void ChromeClientQt::invalidateContentsAndRootView(const IntRect&)
+{
+    notImplemented();
+}
+
+void ChromeClientQt::invalidateContentsForSlowScroll(const IntRect&)
+{
+    notImplemented();
+}
+
+void ChromeClientQt::attachRootGraphicsLayer(WebCore::Frame *, WebCore::GraphicsLayer *)
+{
+    notImplemented();
+}
+
+void ChromeClientQt::attachViewOverlayGraphicsLayer(WebCore::Frame *, WebCore::GraphicsLayer *)
+{
+    notImplemented();
+}
+
+void ChromeClientQt::setNeedsOneShotDrawingSynchronization()
+{
+    notImplemented();
+}
+
+void ChromeClientQt::scheduleCompositingLayerFlush()
+{
+    notImplemented();
+}
+
+void ChromeClientQt::wheelEventHandlersChanged(bool)
+{
+    notImplemented();
 }
 
 } // namespace WebCore

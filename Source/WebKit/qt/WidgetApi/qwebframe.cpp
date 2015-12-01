@@ -895,10 +895,10 @@ void QWebFrame::print(QPrinter *printer, PrintCallback *callback) const
                 }
                 if (headerFooter.isValid()) {
                     // print header/footer
-                    int logicalPage, logicalPages;
-                    d->frame->getPagination(page, printContext.pageCount(), logicalPage, logicalPages);
-                    headerFooter.paintHeader(printContext.graphicsContext(), pageRect, logicalPage, logicalPages);
-                    headerFooter.paintFooter(printContext.graphicsContext(), pageRect, logicalPage, logicalPages);
+                    //int logicalPage, logicalPages;
+                    //d->frame->getPagination(page, printContext.pageCount(), logicalPage, logicalPages);
+                    //headerFooter.paintHeader(printContext.graphicsContext(), pageRect, logicalPage, logicalPages);
+                    //headerFooter.paintFooter(printContext.graphicsContext(), pageRect, logicalPage, logicalPages);
                 }
                 printContext.spoolPage(page - 1, pageRect.width());
                 if (j < pageCopies - 1)

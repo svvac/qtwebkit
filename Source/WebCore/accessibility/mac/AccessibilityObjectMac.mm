@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,6 +25,10 @@
 
 #import "config.h"
 #import "AccessibilityObject.h"
+#import "ElementAncestorIterator.h"
+#import "HTMLFieldSetElement.h"
+#import "RenderObject.h"
+#import "Settings.h"
 
 #if HAVE(ACCESSIBILITY)
 
@@ -36,7 +40,7 @@ namespace WebCore {
 void AccessibilityObject::detachFromParent()
 {
     if (isAttachment())
-        overrideAttachmentParent(0);
+        overrideAttachmentParent(nullptr);
 }
 
 void AccessibilityObject::overrideAttachmentParent(AccessibilityObject* parent)
@@ -50,21 +54,27 @@ void AccessibilityObject::overrideAttachmentParent(AccessibilityObject* parent)
             parent = parent->parentObjectUnignored();
         parentWrapper = parent->wrapper();
     }
-    
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [[wrapper() attachmentView] accessibilitySetOverrideValue:parentWrapper forAttribute:NSAccessibilityParentAttribute];
+#pragma clang diagnostic pop
 }
     
 bool AccessibilityObject::accessibilityIgnoreAttachment() const
 {
     // FrameView attachments are now handled by AccessibilityScrollView, 
     // so if this is the attachment, it should be ignored.
-    Widget* widget = 0;
+    Widget* widget = nullptr;
     if (isAttachment() && (widget = widgetForAttachmentView()) && widget->isFrameView())
         return true;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if ([wrapper() attachmentView])
         return [[wrapper() attachmentView] accessibilityIsIgnored];
-    
+#pragma clang diagnostic pop
+
     // Attachments are ignored by default (unless we determine that we should expose them).
     return true;
 }
@@ -74,14 +84,43 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
     if (isMenuListPopup() || isMenuListOption())
         return IgnoreObject;
 
+    if (roleValue() == CaptionRole)
+        return IgnoreObject;
+
     // Never expose an unknown object on the Mac. Clients of the AX API will not know what to do with it.
     // Special case is when the unknown object is actually an attachment.
     if (roleValue() == UnknownRole && !isAttachment())
         return IgnoreObject;
     
+    if (roleValue() == InlineRole)
+        return IgnoreObject;
+
+    if (RenderObject* renderer = this->renderer()) {
+        // The legend element is ignored if it lives inside of a fieldset element that uses it to generate alternative text.
+        if (renderer->isLegend()) {
+            Element* element = this->element();
+            if (element && ancestorsOfType<HTMLFieldSetElement>(*element).first())
+                return IgnoreObject;
+        }
+    }
+    
     return DefaultBehavior;
 }
     
+bool AccessibilityObject::caretBrowsingEnabled() const
+{
+    Frame* frame = this->frame();
+    return frame && frame->settings().caretBrowsingEnabled();
+}
+
+void AccessibilityObject::setCaretBrowsingEnabled(bool on)
+{
+    Frame* frame = this->frame();
+    if (!frame)
+        return;
+    frame->settings().setCaretBrowsingEnabled(on);
+}
+
 } // WebCore
 
 #endif // HAVE(ACCESSIBILITY)

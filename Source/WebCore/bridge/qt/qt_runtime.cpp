@@ -21,7 +21,6 @@
 #include "qt_runtime.h"
 
 #include "APICast.h"
-#include "APIShims.h"
 #include "BooleanObject.h"
 #include "DateInstance.h"
 #include "DatePrototype.h"
@@ -148,22 +147,22 @@ void registerCustomType(int qtMetaTypeId, ConvertToVariantFunction toVariantFunc
 
 static bool isJSUint8Array(JSObjectRef object)
 {
-    return toJS(object)->inherits(&JSUint8Array::s_info);
+    return toJS(object)->inherits(JSUint8Array::info());
 }
 
 static bool isJSArray(JSObjectRef object)
 {
-    return toJS(object)->inherits(&JSArray::s_info);
+    return toJS(object)->inherits(JSArray::info());
 }
 
 static bool isJSDate(JSObjectRef object)
 {
-    return toJS(object)->inherits(&DateInstance::s_info);
+    return toJS(object)->inherits(DateInstance::info());
 }
 
 static bool isQtObject(JSObjectRef object)
 {
-    return toJS(object)->inherits(&RuntimeObject::s_info);
+    return toJS(object)->inherits(RuntimeObject::info());
 }
 
 static JSRealType valueRealType(JSContextRef context, JSValueRef value, JSValueRef* exception)
@@ -201,13 +200,12 @@ static QString toString(JSStringRef stringRef)
 static JSValueRef unwrapBoxedPrimitive(JSContextRef context, JSValueRef value, JSObjectRef obj)
 {
     ExecState* exec = toJS(context);
-    APIEntryShim entryShim(exec);
     JSObject* object = toJS(obj);
-    if (object->inherits(&NumberObject::s_info))
+    if (object->inherits(NumberObject::info()))
         return toRef(exec, jsNumber(object->toNumber(exec)));
-    if (object->inherits(&StringObject::s_info))
+    if (object->inherits(StringObject::info()))
         return toRef(exec, object->toString(exec));
-    if (object->inherits(&BooleanObject::s_info))
+    if (object->inherits(BooleanObject::info()))
         return toRef(exec, object->toPrimitive(exec));
     return value;
 }
@@ -283,7 +281,6 @@ static QString toQString(JSContextRef context, JSValueRef value)
 static void getGregorianDateTimeUTC(JSContextRef context, JSRealType type, JSValueRef value, JSObjectRef object, JSValueRef* exception, GregorianDateTime* gdt)
 {
     ExecState* exec = toJS(context);
-    APIEntryShim entryShim(exec);
     if (type == Date) {
         JSObject* jsObject = toJS(object);
         DateInstance* date = asDateInstance(jsObject);
@@ -291,7 +288,7 @@ static void getGregorianDateTimeUTC(JSContextRef context, JSRealType type, JSVal
     } else {
         double ms = JSValueToNumber(context, value, exception);
         GregorianDateTime convertedGdt;
-        msToGregorianDateTime(exec, ms, /*utc*/ true, convertedGdt);
+        msToGregorianDateTime(exec->vm(), ms, WTF::TimeType::UTCTime, convertedGdt);
         gdt->copyFrom(convertedGdt);
     }
 }
@@ -494,8 +491,8 @@ QVariant convertValueToQVariant(JSContextRef context, JSValueRef value, QMetaTyp
 
         case QMetaType::QByteArray: {
             if (type == RTUint8Array) {
-                WTF::Uint8Array* arr = toUint8Array(toJS(toJS(context), value));
-                ret = QVariant(QByteArray(reinterpret_cast<const char*>(arr->data()), arr->length()));
+                //RefPtr<WTF::Uint8Array> arr = toUint8Array(toJS(toJS(context), value));
+                //ret = QVariant(QByteArray(reinterpret_cast<const char*>(arr->data()), arr->length()));
                 dist = 0;
             } else {
                 ret = QVariant(toQString(context, value).toLatin1());
@@ -728,12 +725,12 @@ JSValueRef convertQVariantToValue(JSContextRef context, PassRefPtr<RootObject> r
     }
 
     if (type == QMetaType::QByteArray) {
-        QByteArray qtByteArray = variant.value<QByteArray>();
-        WTF::RefPtr<WTF::Uint8ClampedArray> wtfByteArray = WTF::Uint8ClampedArray::createUninitialized(qtByteArray.length());
-        memcpy(wtfByteArray->data(), qtByteArray.constData(), qtByteArray.length());
-        ExecState* exec = toJS(context);
-        APIEntryShim entryShim(exec);
-        return toRef(exec, toJS(exec, static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject()), wtfByteArray.get()));
+        //QByteArray qtByteArray = variant.value<QByteArray>();
+        //WTF::RefPtr<WTF::B Uint8ClampedArray> wtfByteArray = WTF::Uint8ClampedArray::createUninitialized(qtByteArray.length());
+        //memcpy(wtfByteArray->data(), qtByteArray.constData(), qtByteArray.length());
+        //ExecState* exec = toJS(context);
+        //return toRef(exec, toJS(exec, static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject()), wtfByteArray.get()));
+        return JSValueMakeNull(context);
     }
 
     if (QMetaType::typeFlags(type).testFlag(QMetaType::PointerToQObject)) {
@@ -741,7 +738,6 @@ JSValueRef convertQVariantToValue(JSContextRef context, PassRefPtr<RootObject> r
         if (!obj)
             return JSValueMakeNull(context);
         ExecState* exec = toJS(context);
-        APIEntryShim entryShim(exec);
         return toRef(exec, QtInstance::getQtInstance(obj, root, QtInstance::QtOwnership)->createRuntimeObject(exec));
     }
 
@@ -749,14 +745,13 @@ JSValueRef convertQVariantToValue(JSContextRef context, PassRefPtr<RootObject> r
         return QtPixmapRuntime::toJS(context, variant, exception);
 
     if (customRuntimeConversions()->contains(type)) {
-        if (!root->globalObject()->inherits(&JSDOMWindow::s_info))
+        if (!root->globalObject()->inherits(JSDOMWindow::info()))
             return JSValueMakeUndefined(context);
 
-        Document* document = (static_cast<JSDOMWindow*>(root->globalObject()))->impl()->document();
+        Document* document = (static_cast<JSDOMWindow*>(root->globalObject()))->wrapped().document();
         if (!document)
             return JSValueMakeUndefined(context);
         ExecState* exec = toJS(context);
-        APIEntryShim entryShim(exec);
         return toRef(exec, customRuntimeConversions()->value(type).toJSValueFunc(exec, toJSDOMGlobalObject(document, exec), variant));
     }
 
@@ -807,7 +802,6 @@ JSValueRef convertQVariantToValue(JSContextRef context, PassRefPtr<RootObject> r
         JSObjectRef array = JSObjectMakeArray(context, 0, 0, exception);
         RefPtr<RootObject> rootRef(root); // We need a real reference, since PassRefPtr may only be passed on to one call.
         ExecState* exec = toJS(context);
-        APIEntryShim entryShim(exec);
         for (int i = 0; i < ol.count(); ++i) {
             JSValueRef jsObject = toRef(exec, QtInstance::getQtInstance(ol.at(i), rootRef, QtInstance::QtOwnership)->createRuntimeObject(exec));
             JSObjectSetPropertyAtIndex(context, array, i, jsObject, /*ignored exception*/0);
@@ -1302,7 +1296,7 @@ JSObjectRef QtRuntimeMethod::jsObjectRef(JSContextRef context, JSValueRef* excep
     JSObjectSetProperty(context, object, connectStr, connectFunction, attributes, exception);
     JSObjectSetProperty(context, object, disconnectStr, disconnectFunction, attributes, exception);
 
-    m_jsObject = PassWeak<JSObject>(toJS(object));
+    m_jsObject = toJS(object);
 
     return object;
 }

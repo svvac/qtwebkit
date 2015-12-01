@@ -74,13 +74,13 @@ JSValue QtClass::fallbackObject(ExecState* exec, Instance* inst, PropertyName id
     JSValueRef exception = 0;
 
     String ustring(identifier.publicName());
-    const QByteArray name = QString(reinterpret_cast<const QChar*>(ustring.characters()), ustring.length()).toLatin1();
+    const QByteArray name = QString(reinterpret_cast<const QChar*>(ustring.characters8()), ustring.length()).toLatin1();
 
     // First see if we have a cache hit
     if (QtRuntimeMethod* method = qtinst->m_methods.value(name)) {
         JSValue obj = toJS(method->jsObjectRef(context, &exception));
         if (exception)
-            return throwError(exec, toJS(exec, exception));
+            return exec->vm().throwException(exec, createError(exec, ASCIILiteral("QT")));
         return obj;
     }
 
@@ -117,7 +117,7 @@ JSValue QtClass::fallbackObject(ExecState* exec, Instance* inst, PropertyName id
     qtinst->m_methods.insert(name, method);
     JSValue obj = toJS(method->jsObjectRef(context, &exception));
     if (exception)
-        return throwError(exec, toJS(exec, exception));
+        return exec->vm().throwException(exec, createError(exec, ASCIILiteral("QT")));
     return obj;
 }
 
@@ -137,7 +137,7 @@ Field* QtClass::fieldNamed(PropertyName identifier, Instance* instance) const
 
     QObject* obj = qtinst->getObject();
     String ustring(identifier.publicName());
-    const QString name(reinterpret_cast<const QChar*>(ustring.characters()), ustring.length());
+    const QString name(reinterpret_cast<const QChar*>(ustring.characters8()), ustring.length());
     const QByteArray ascii = name.toLatin1();
 
     // First check for a cached field

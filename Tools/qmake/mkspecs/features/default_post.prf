@@ -43,6 +43,10 @@ DEFINES += \
     BUILDING_QT__=1
 
 CONFIG(release, debug|release): DEFINES *= NDEBUG
+msvc*: {
+  DEFINES += NOMINMAX
+  QMAKE_CXXFLAGS += -EHsc
+}
 
 DEFINES += $$configDefines()
 

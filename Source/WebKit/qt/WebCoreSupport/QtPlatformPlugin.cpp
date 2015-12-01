@@ -102,42 +102,47 @@ QWebKitPlatformPlugin* QtPlatformPlugin::plugin()
     return m_plugin;
 }
 
-PassOwnPtr<QWebSelectMethod> QtPlatformPlugin::createSelectInputMethod()
+std::unique_ptr<QWebSelectMethod> QtPlatformPlugin::createSelectInputMethod()
 {
-    QWebKitPlatformPlugin* p = plugin();
-    return adoptPtr(p ? static_cast<QWebSelectMethod*>(p->createExtension(QWebKitPlatformPlugin::MultipleSelections)) : 0);
+    //QWebKitPlatformPlugin* p = plugin();
+    //return std::make_unique<QWebSelectMethod>(p ? static_cast<QWebSelectMethod*>(p->createExtension(QWebKitPlatformPlugin::MultipleSelections)) : 0);
+  return nullptr;
 }
 
-PassOwnPtr<QWebNotificationPresenter> QtPlatformPlugin::createNotificationPresenter()
+std::unique_ptr<QWebNotificationPresenter> QtPlatformPlugin::createNotificationPresenter()
 {
-    QWebKitPlatformPlugin* p = plugin();
-    return adoptPtr(p ? static_cast<QWebNotificationPresenter*>(p->createExtension(QWebKitPlatformPlugin::Notifications)) : 0);
+    //QWebKitPlatformPlugin* p = plugin();
+    //return std::make_unique<QWebSelectMethod>(p ? static_cast<QWebNotificationPresenter*>(p->createExtension(QWebKitPlatformPlugin::Notifications)) : 0);
+    return nullptr;
 }
 
-PassOwnPtr<QWebHapticFeedbackPlayer> QtPlatformPlugin::createHapticFeedbackPlayer()
+std::unique_ptr<QWebHapticFeedbackPlayer> QtPlatformPlugin::createHapticFeedbackPlayer()
 {
-    QWebKitPlatformPlugin* p = plugin();
-    return adoptPtr(p ? static_cast<QWebHapticFeedbackPlayer*>(p->createExtension(QWebKitPlatformPlugin::Haptics)) : 0);
+    //QWebKitPlatformPlugin* p = plugin();
+    //std::make_unique<QWebSelectMethod>(p ? static_cast<QWebHapticFeedbackPlayer*>(p->createExtension(QWebKitPlatformPlugin::Haptics)) : 0);
+    return nullptr;
 }
 
-PassOwnPtr<QWebTouchModifier> QtPlatformPlugin::createTouchModifier()
+std::unique_ptr<QWebTouchModifier> QtPlatformPlugin::createTouchModifier()
 {
-    QWebKitPlatformPlugin* p = plugin();
-    return adoptPtr(p ? static_cast<QWebTouchModifier*>(p->createExtension(QWebKitPlatformPlugin::TouchInteraction)) : 0);
+    //QWebKitPlatformPlugin* p = plugin();
+    return nullptr;
+    //return std::make_unique<QWebSelectMethod>(p ? static_cast<QWebTouchModifier*>(p->createExtension(QWebKitPlatformPlugin::TouchInteraction)) : 0);
 }
 
 #if ENABLE(VIDEO) && USE(QT_MULTIMEDIA)
-PassOwnPtr<QWebFullScreenVideoHandler> QtPlatformPlugin::createFullScreenVideoHandler()
+std::unique_ptr<QWebFullScreenVideoHandler> QtPlatformPlugin::createFullScreenVideoHandler()
 {
     QWebKitPlatformPlugin* p = plugin();
     return adoptPtr(p ? static_cast<QWebFullScreenVideoHandler*>(p->createExtension(QWebKitPlatformPlugin::FullScreenVideoPlayer)) : 0);
 }
 #endif
 
-PassOwnPtr<QWebSpellChecker> QtPlatformPlugin::createSpellChecker()
+std::unique_ptr<QWebSpellChecker> QtPlatformPlugin::createSpellChecker()
 {
-    QWebKitPlatformPlugin* p = plugin();
-    return adoptPtr(p ? static_cast<QWebSpellChecker*>(p->createExtension(QWebKitPlatformPlugin::SpellChecker)) : 0);
+    //QWebKitPlatformPlugin* p = plugin();
+    return nullptr;
+   // return std::make_unique<QWebSelectMethod>(p ? static_cast<QWebSpellChecker*>(p->createExtension(QWebKitPlatformPlugin::SpellChecker)) : 0);
 }
 
 }

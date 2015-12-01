@@ -27,13 +27,10 @@
 #define ConservativeRoots_h
 
 #include "Heap.h"
-#include <wtf/OSAllocator.h>
-#include <wtf/Vector.h>
 
 namespace JSC {
 
-class DFGCodeBlocks;
-class Heap;
+class CodeBlockSet;
 class JITStubRoutineSet;
 class JSCell;
 
@@ -44,7 +41,7 @@ public:
 
     void add(void* begin, void* end);
     void add(void* begin, void* end, JITStubRoutineSet&);
-    void add(void* begin, void* end, JITStubRoutineSet&, DFGCodeBlocks&);
+    void add(void* begin, void* end, JITStubRoutineSet&, CodeBlockSet&);
     
     size_t size();
     JSCell** roots();

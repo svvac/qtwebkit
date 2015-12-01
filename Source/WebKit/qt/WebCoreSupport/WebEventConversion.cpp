@@ -22,7 +22,6 @@
 #include "config.h"
 #include "WebEventConversion.h"
 
-#include "PlatformGestureEvent.h"
 #include "PlatformMouseEvent.h"
 #include "PlatformTouchEvent.h"
 #include "PlatformTouchPoint.h"
@@ -240,35 +239,6 @@ WebKitPlatformTouchPoint::WebKitPlatformTouchPoint(const QTouchEvent::TouchPoint
 }
 #endif
 
-#if ENABLE(GESTURE_EVENTS)
-class WebKitPlatformGestureEvent : public PlatformGestureEvent {
-public:
-    WebKitPlatformGestureEvent(QGestureEventFacade*);
-};
-
-static inline PlatformEvent::Type toPlatformEventType(Qt::GestureType type)
-{
-    switch (type) {
-    case Qt::TapGesture:
-        return PlatformEvent::GestureTap;
-    case Qt::TapAndHoldGesture:
-        return PlatformEvent::GestureLongPress;
-    default:
-        ASSERT_NOT_REACHED();
-        return PlatformEvent::NoType;
-    }
-}
-
-WebKitPlatformGestureEvent::WebKitPlatformGestureEvent(QGestureEventFacade* event)
-{
-    m_type = toPlatformEventType(event->type);
-    m_globalPosition = event->globalPos;
-    m_position = event->pos;
-    m_timestamp = WTF::currentTime();
-}
-
-#endif
-
 PlatformWheelEvent convertWheelEvent(QWheelEvent* event, int wheelScrollLines)
 {
     return WebKitPlatformWheelEvent(event, wheelScrollLines);
@@ -281,10 +251,4 @@ PlatformTouchEvent convertTouchEvent(QTouchEvent* event)
 }
 #endif
 
-#if ENABLE(GESTURE_EVENTS)
-PlatformGestureEvent convertGesture(QGestureEventFacade* event)
-{
-    return WebKitPlatformGestureEvent(event);
-}
-#endif
 }

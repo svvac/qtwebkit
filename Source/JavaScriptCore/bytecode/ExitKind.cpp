@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,42 +38,53 @@ const char* exitKindToString(ExitKind kind)
         return "Unset";
     case BadType:
         return "BadType";
-    case BadFunction:
-        return "BadFunction";
+    case BadCell:
+        return "BadCell";
+    case BadIdent:
+        return "BadIdent";
     case BadExecutable:
         return "BadExecutable";
     case BadCache:
         return "BadCache";
-    case BadWeakConstantCache:
-        return "BadWeakConstantCache";
+    case BadConstantCache:
+        return "BadConstantCache";
     case BadIndexingType:
         return "BadIndexingType";
     case Overflow:
         return "Overflow";
     case NegativeZero:
         return "NegativeZero";
+    case Int52Overflow:
+        return "Int52Overflow";
     case StoreToHole:
         return "StoreToHole";
     case LoadFromHole:
         return "LoadFromHole";
     case OutOfBounds:
         return "OutOfBounds";
-    case StoreToHoleOrOutOfBounds:
-        return "StoreToHoleOrOutOfBounds";
     case InadequateCoverage:
         return "InadequateCoverage";
     case ArgumentsEscaped:
         return "ArgumentsEscaped";
+    case ExoticObjectMode:
+        return "ExoticObjectMode";
     case NotStringObject:
         return "NotStringObject";
+    case VarargsOverflow:
+        return "VarargsOverflow";
+    case TDZFailure:
+        return "TDZFailure";
     case Uncountable:
         return "Uncountable";
-    case UncountableWatchpoint:
-        return "UncountableWatchpoint";
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        return "Unknown";
+    case UncountableInvalidation:
+        return "UncountableInvalidation";
+    case WatchdogTimerFired:
+        return "WatchdogTimerFired";
+    case DebuggerEvent:
+        return "DebuggerEvent";
     }
+    RELEASE_ASSERT_NOT_REACHED();
+    return "Unknown";
 }
 
 bool exitKindIsCountable(ExitKind kind)
@@ -83,11 +94,9 @@ bool exitKindIsCountable(ExitKind kind)
         RELEASE_ASSERT_NOT_REACHED();
     case BadType:
     case Uncountable:
-    case UncountableWatchpoint:
     case LoadFromHole: // Already counted directly by the baseline JIT.
     case StoreToHole: // Already counted directly by the baseline JIT.
     case OutOfBounds: // Already counted directly by the baseline JIT.
-    case StoreToHoleOrOutOfBounds: // Already counted directly by the baseline JIT.
         return false;
     default:
         return true;

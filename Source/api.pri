@@ -51,9 +51,8 @@ win* {
     include_webinspector {
         # WEBCORE_GENERATED_SOURCES_DIR is defined in WebCore.pri, included by
         # load(webkit_modules) if WEBKIT contains webcore.
-        RESOURCES += \
-            $$PWD/WebCore/inspector/front-end/WebKit.qrc \
-            $${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendCommands.qrc
+        #RESOURCES += \
+            #$${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendCommands.qrc
     }
 }
 

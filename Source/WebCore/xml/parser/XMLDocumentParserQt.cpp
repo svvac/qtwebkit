@@ -55,6 +55,7 @@
 #include "TransformSource.h"
 #include "XMLNSNames.h"
 #include <QDebug>
+#include <QXmlStreamEntityResolver>
 #include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -94,7 +95,7 @@ bool XMLDocumentParser::supportsXMLVersion(const String& version)
     return version == "1.0";
 }
 
-XMLDocumentParser::XMLDocumentParser(Document* document, FrameView* frameView)
+XMLDocumentParser::XMLDocumentParser(Document& document, FrameView* frameView)
     : ScriptableDocumentParser(document)
     , m_view(frameView)
     , m_wroteText(false)

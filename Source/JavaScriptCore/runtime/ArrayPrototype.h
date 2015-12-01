@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2007, 2011 Apple Inc. All rights reserved.
+ *  Copyright (C) 2007, 2011, 2015 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -28,26 +28,26 @@ namespace JSC {
 
 class ArrayPrototype : public JSArray {
 private:
-    ArrayPrototype(JSGlobalObject*, Structure*);
+    ArrayPrototype(VM&, Structure*);
 
 public:
     typedef JSArray Base;
 
-    static ArrayPrototype* create(ExecState*, JSGlobalObject*, Structure*);
+    static ArrayPrototype* create(VM&, JSGlobalObject*, Structure*);
         
-    static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info, ArrayClass);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info(), ArrayClass);
     }
 
 protected:
-    void finishCreation(JSGlobalObject*);
+    void finishCreation(VM&, JSGlobalObject*);
 };
+
+EncodedJSValue JSC_HOST_CALL arrayProtoFuncToString(ExecState*);
+EncodedJSValue JSC_HOST_CALL arrayProtoFuncValues(ExecState*);
 
 } // namespace JSC
 

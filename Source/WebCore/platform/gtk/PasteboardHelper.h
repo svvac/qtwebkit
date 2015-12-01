@@ -25,27 +25,22 @@
 #ifndef PasteboardHelper_h
 #define PasteboardHelper_h
 
-#include "Frame.h"
-#include <glib-object.h>
+#include <wtf/HashSet.h>
+#include <wtf/Noncopyable.h>
+#include <wtf/Vector.h>
+#include <wtf/glib/GRefPtr.h>
 
 namespace WebCore {
 
 class DataObjectGtk;
 
 class PasteboardHelper {
+    WTF_MAKE_NONCOPYABLE(PasteboardHelper);
 public:
-    PasteboardHelper();
-    virtual ~PasteboardHelper();
-    static PasteboardHelper* defaultPasteboardHelper();
-
-    void setUsePrimarySelectionClipboard(bool usePrimary) { m_usePrimarySelectionClipboard = usePrimary; }
-    bool usePrimarySelectionClipboard() { return m_usePrimarySelectionClipboard; }
+    static PasteboardHelper& singleton();
 
     enum SmartPasteInclusion { IncludeSmartPaste, DoNotIncludeSmartPaste };
 
-    GtkClipboard* getCurrentClipboard(Frame*);
-    GtkClipboard* getClipboard(Frame*) const;
-    GtkClipboard* getPrimarySelectionClipboard(Frame*) const;
     GtkTargetList* targetList() const;
     GtkTargetList* targetListForDataObject(DataObjectGtk*, SmartPasteInclusion = DoNotIncludeSmartPaste);
     void fillSelectionData(GtkSelectionData*, guint, DataObjectGtk*);
@@ -57,9 +52,14 @@ public:
     enum PasteboardTargetType { TargetTypeMarkup, TargetTypeText, TargetTypeImage, TargetTypeURIList, TargetTypeNetscapeURL, TargetTypeSmartPaste, TargetTypeUnknown };
     bool clipboardContentSupportsSmartReplace(GtkClipboard*);
 
+    void registerClipboard(GtkClipboard*);
+
 private:
-    GtkTargetList* m_targetList;
-    bool m_usePrimarySelectionClipboard;
+    PasteboardHelper();
+    ~PasteboardHelper();
+
+    GRefPtr<GtkTargetList> m_targetList;
+    HashSet<GtkClipboard*> m_gtkClipboards;
 };
 
 }

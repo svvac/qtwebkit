@@ -31,10 +31,15 @@
     [Reflect] attribute boolean isMap;
     [Reflect, URL] attribute DOMString longDesc;
     [Reflect, URL] attribute DOMString src;
+    [Reflect] attribute DOMString srcset;
+    [Reflect] attribute DOMString sizes;
+#if ENABLE_CURRENTSRC
+    readonly attribute DOMString currentSrc;
+#endif
     [Reflect] attribute DOMString useMap;
     [Reflect] attribute long vspace;
     attribute long width;
-    
+
     // Extensions
     readonly attribute boolean complete;
     [Reflect,URL] attribute DOMString lowsrc;

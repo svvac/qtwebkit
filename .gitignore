@@ -10,6 +10,7 @@ Makefile.*
 .qmake.cache
 .qmake.stash
 Source/.pch/
+*.pyc
 
 Source/JavaScriptCore/LLIntDesiredOffsets.h
 Source/JavaScriptCore/LLIntOffsetsExtractor

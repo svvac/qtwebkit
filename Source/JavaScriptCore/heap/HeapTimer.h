@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,20 +26,19 @@
 #ifndef HeapTimer_h
 #define HeapTimer_h
 
+#include <wtf/Lock.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Threading.h>
 
-#if USE(CF)
-#include <CoreFoundation/CoreFoundation.h>
-#elif PLATFORM(BLACKBERRY)
-#include <BlackBerryPlatformTimer.h>
-#elif PLATFORM(QT)
+#if PLATFORM(QT)
 #include <QBasicTimer>
 #include <QMutex>
 #include <QObject>
 #include <QThread>
-#elif PLATFORM(EFL)
-typedef struct _Ecore_Timer Ecore_Timer;
+#endif
+
+#if USE(CF)
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 namespace JSC {
@@ -59,7 +58,7 @@ public:
     HeapTimer(VM*);
 #endif
     
-    virtual ~HeapTimer();
+    JS_EXPORT_PRIVATE virtual ~HeapTimer();
     virtual void doWork() = 0;
     
 protected:
@@ -72,22 +71,18 @@ protected:
     RetainPtr<CFRunLoopRef> m_runLoop;
     CFRunLoopTimerContext m_context;
 
-    Mutex m_shutdownMutex;
-#elif PLATFORM(BLACKBERRY)
-    void timerDidFire();
-
-    BlackBerry::Platform::Timer<HeapTimer> m_timer;
+    Lock m_shutdownMutex;
+#elif PLATFORM(EFL)
+    static bool timerEvent(void*);
+    Ecore_Timer* add(double delay, void* agent);
+    void stop();
+    Ecore_Timer* m_timer;
 #elif PLATFORM(QT)
     void timerEvent(QTimerEvent*);
     void customEvent(QEvent*);
     QBasicTimer m_timer;
     QThread* m_newThread;
     QMutex m_mutex;
-#elif PLATFORM(EFL)
-    static bool timerEvent(void*);
-    Ecore_Timer* add(double delay, void* agent);
-    void stop();
-    Ecore_Timer* m_timer;
 #endif
     
 private:

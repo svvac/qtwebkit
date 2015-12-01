@@ -20,6 +20,8 @@
 #ifndef ThirdPartyCookiesQt_h
 #define ThirdPartyCookiesQt_h
 
+#include <qglobal.h>
+
 QT_BEGIN_NAMESPACE
 class QNetworkCookieJar;
 class QUrl;

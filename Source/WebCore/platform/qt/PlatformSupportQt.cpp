@@ -23,7 +23,6 @@
 #include "PlatformSupport.h"
 
 #include "Frame.h"
-#include "PluginView.h"
 #include "Widget.h"
 #include "npapi.h"
 

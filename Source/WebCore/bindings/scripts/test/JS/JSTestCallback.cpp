@@ -20,24 +20,29 @@
 
 #include "config.h"
 
-#if ENABLE(SQL_DATABASE)
+#if ENABLE(SPEECH_SYNTHESIS)
 
 #include "JSTestCallback.h"
 
+#include "DOMStringList.h"
+#include "JSDOMConstructor.h"
 #include "JSDOMStringList.h"
-#include "JSFloat32Array.h"
 #include "JSTestNode.h"
 #include "ScriptExecutionContext.h"
 #include "SerializedScriptValue.h"
+#include "TestNode.h"
+#include "URL.h"
 #include <runtime/JSLock.h>
+#include <runtime/JSString.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
 JSTestCallback::JSTestCallback(JSObject* callback, JSDOMGlobalObject* globalObject)
-    : ActiveDOMCallback(globalObject->scriptExecutionContext())
-    , m_data(new JSCallbackData(callback, globalObject))
+    : TestCallback()
+    , ActiveDOMCallback(globalObject->scriptExecutionContext())
+    , m_data(new JSCallbackDataStrong(callback, this))
 {
 }
 
@@ -49,11 +54,41 @@ JSTestCallback::~JSTestCallback()
     if (!context || context->isContextThread())
         delete m_data;
     else
-        context->postTask(DeleteCallbackDataTask::create(m_data));
+        context->postTask(DeleteCallbackDataTask(m_data));
 #ifndef NDEBUG
-    m_data = 0;
+    m_data = nullptr;
 #endif
 }
+
+typedef JSDOMConstructorNotConstructable<JSTestCallback> JSTestCallbackConstructor;
+
+/* Hash table for constructor */
+
+static const HashTableValue JSTestCallbackConstructorTableValues[] =
+{
+    { "CONSTANT1", DontDelete | ReadOnly | ConstantInteger, NoIntrinsic, { (long long)(1) } },
+    { "CONSTANT2", DontDelete | ReadOnly | ConstantInteger, NoIntrinsic, { (long long)(2) } },
+};
+
+
+COMPILE_ASSERT(1 == TestCallback::CONSTANT1, TestCallbackEnumCONSTANT1IsWrongUseDoNotCheckConstants);
+COMPILE_ASSERT(2 == TestCallback::CONSTANT2, TestCallbackEnumCONSTANT2IsWrongUseDoNotCheckConstants);
+
+template<> void JSTestCallbackConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
+{
+    UNUSED_PARAM(globalObject);
+    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestCallback"))), ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
+    reifyStaticProperties(vm, JSTestCallbackConstructorTableValues, *this);
+}
+
+template<> const ClassInfo JSTestCallbackConstructor::s_info = { "TestCallbackConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCallbackConstructor) };
+
+JSValue JSTestCallback::getConstructor(VM& vm, JSGlobalObject* globalObject)
+{
+    return getDOMConstructor<JSTestCallbackConstructor>(vm, *jsCast<JSDOMGlobalObject*>(globalObject));
+}
+
 
 // Functions
 
@@ -62,33 +97,38 @@ bool JSTestCallback::callbackWithNoParam()
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackWithNoParam"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
 }
 
-bool JSTestCallback::callbackWithArrayParam(Float32Array* arrayParam)
+bool JSTestCallback::callbackWithArrayParam(RefPtr<Float32Array> arrayParam)
 {
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
-    args.append(toJS(exec, m_data->globalObject(), arrayParam));
+    args.append(toJS(state, m_data->globalObject(), WTF::getPtr(arrayParam)));
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackWithArrayParam"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
 }
 
 bool JSTestCallback::callbackWithSerializedScriptValueParam(PassRefPtr<SerializedScriptValue> srzParam, const String& strArg)
@@ -96,18 +136,20 @@ bool JSTestCallback::callbackWithSerializedScriptValueParam(PassRefPtr<Serialize
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
-    args.append(srzParam ? srzParam->deserialize(exec, m_data->globalObject(), 0) : jsNull());
-    args.append(jsStringWithCache(exec, strArg));
+    args.append(srzParam ? srzParam->deserialize(state, castedThis->globalObject(), 0) : jsNull());
+    args.append(jsStringWithCache(state, strArg));
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackWithSerializedScriptValueParam"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
 }
 
 bool JSTestCallback::callbackWithStringList(PassRefPtr<DOMStringList> listParam)
@@ -115,17 +157,19 @@ bool JSTestCallback::callbackWithStringList(PassRefPtr<DOMStringList> listParam)
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
-    args.append(toJS(exec, m_data->globalObject(), listParam));
+    args.append(toJS(state, m_data->globalObject(), WTF::getPtr(listParam)));
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackWithStringList"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
 }
 
 bool JSTestCallback::callbackWithBoolean(bool boolParam)
@@ -133,17 +177,19 @@ bool JSTestCallback::callbackWithBoolean(bool boolParam)
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
     args.append(jsBoolean(boolParam));
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackWithBoolean"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
 }
 
 bool JSTestCallback::callbackRequiresThisToPass(int longParam, TestNode* testNodeParam)
@@ -151,20 +197,31 @@ bool JSTestCallback::callbackRequiresThisToPass(int longParam, TestNode* testNod
     if (!canInvokeCallback())
         return true;
 
-    RefPtr<JSTestCallback> protect(this);
+    Ref<JSTestCallback> protect(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
-    args.append(toJS(exec, m_data->globalObject(), longParam));
-    args.append(toJS(exec, m_data->globalObject(), testNodeParam));
+    args.append(jsNumber(longParam));
+    args.append(toJS(state, m_data->globalObject(), WTF::getPtr(testNodeParam)));
 
-    bool raisedException = false;
-    m_data->invokeCallback(args, &raisedException);
-    return !raisedException;
+    NakedPtr<Exception> returnedException;
+    m_data->invokeCallback(args, JSCallbackData::CallbackType::Object, Identifier::fromString(state, "callbackRequiresThisToPass"), returnedException);
+    if (returnedException)
+        reportException(state, returnedException);
+    return !returnedException;
+}
+
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestCallback* impl)
+{
+    if (!impl || !static_cast<JSTestCallback&>(*impl).callbackData())
+        return jsNull();
+
+    return static_cast<JSTestCallback&>(*impl).callbackData()->callback();
+
 }
 
 }
 
-#endif // ENABLE(SQL_DATABASE)
+#endif // ENABLE(SPEECH_SYNTHESIS)

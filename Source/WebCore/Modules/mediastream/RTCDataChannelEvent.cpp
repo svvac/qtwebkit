@@ -32,16 +32,15 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCDataChannelEvent> RTCDataChannelEvent::create()
+Ref<RTCDataChannelEvent> RTCDataChannelEvent::create()
 {
-    return adoptRef(new RTCDataChannelEvent);
+    return adoptRef(*new RTCDataChannelEvent);
 }
 
-PassRefPtr<RTCDataChannelEvent> RTCDataChannelEvent::create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<RTCDataChannel> channel)
+Ref<RTCDataChannelEvent> RTCDataChannelEvent::create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<RTCDataChannel> channel)
 {
-    return adoptRef(new RTCDataChannelEvent(type, canBubble, cancelable, channel));
+    return adoptRef(*new RTCDataChannelEvent(type, canBubble, cancelable, channel));
 }
-
 
 RTCDataChannelEvent::RTCDataChannelEvent()
 {
@@ -62,9 +61,9 @@ RTCDataChannel* RTCDataChannelEvent::channel() const
     return m_channel.get();
 }
 
-const AtomicString& RTCDataChannelEvent::interfaceName() const
+EventInterface RTCDataChannelEvent::eventInterface() const
 {
-    return eventNames().interfaceForRTCDataChannelEvent;
+    return RTCDataChannelEventInterfaceType;
 }
 
 } // namespace WebCore

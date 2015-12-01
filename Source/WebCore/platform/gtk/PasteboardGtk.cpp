@@ -20,26 +20,12 @@
 #include "config.h"
 #include "Pasteboard.h"
 
-#include "CachedImage.h"
 #include "DataObjectGtk.h"
-#include "DocumentFragment.h"
-#include "Editor.h"
-#include "Frame.h"
-#include "HTMLImageElement.h"
-#include "HTMLInputElement.h"
-#include "HTMLNames.h"
-#include "HTMLParserIdioms.h"
+#include "DragData.h"
 #include "Image.h"
-#include "KURL.h"
+#include "URL.h"
 #include "PasteboardHelper.h"
-#include "RenderImage.h"
-#include "markup.h"
 #include <gtk/gtk.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "XLinkNames.h"
-#endif
 
 namespace WebCore {
 
@@ -52,56 +38,45 @@ enum ClipboardDataType {
     ClipboardDataTypeUnknown
 };
 
-PassOwnPtr<Pasteboard> Pasteboard::create(GtkClipboard* gtkClipboard)
+std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste()
 {
-    return adoptPtr(new Pasteboard(gtkClipboard));
+    return std::make_unique<Pasteboard>(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::create(PassRefPtr<DataObjectGtk> dataObject)
+std::unique_ptr<Pasteboard> Pasteboard::createForGlobalSelection()
 {
-    return adoptPtr(new Pasteboard(dataObject));
+    return std::make_unique<Pasteboard>(gtk_clipboard_get(GDK_SELECTION_PRIMARY));
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createForCopyAndPaste()
+std::unique_ptr<Pasteboard> Pasteboard::createPrivate()
 {
-    return create(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+    return std::make_unique<Pasteboard>(DataObjectGtk::create());
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createPrivate()
+#if ENABLE(DRAG_SUPPORT)
+std::unique_ptr<Pasteboard> Pasteboard::createForDragAndDrop()
 {
-    return create(DataObjectGtk::create());
+    return std::make_unique<Pasteboard>(DataObjectGtk::create());
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createForDragAndDrop()
+std::unique_ptr<Pasteboard> Pasteboard::createForDragAndDrop(const DragData& dragData)
 {
-    return create(DataObjectGtk::create());
+    return std::make_unique<Pasteboard>(dragData.platformData());
+}
+#endif
+
+// Making this non-inline so that WebKit 2's decoding doesn't have to include Image.h.
+PasteboardImage::PasteboardImage()
+{
 }
 
-PassOwnPtr<Pasteboard> Pasteboard::createForDragAndDrop(const DragData& dragData)
+PasteboardImage::~PasteboardImage()
 {
-    return create(dragData.platformData());
-}
-
-static Pasteboard* selectionClipboard()
-{
-    static Pasteboard* pasteboard = Pasteboard::create(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD)).leakPtr();
-    return pasteboard;
-}
-
-static Pasteboard* primaryClipboard()
-{
-    static Pasteboard* pasteboard = Pasteboard::create(gtk_clipboard_get(GDK_SELECTION_PRIMARY)).leakPtr();
-    return pasteboard;
-}
-
-Pasteboard* Pasteboard::generalPasteboard()
-{
-    return PasteboardHelper::defaultPasteboardHelper()->usePrimarySelectionClipboard() ? primaryClipboard() : selectionClipboard();
 }
 
 Pasteboard::Pasteboard(PassRefPtr<DataObjectGtk> dataObject)
     : m_dataObject(dataObject)
-    , m_gtkClipboard(0)
+    , m_gtkClipboard(nullptr)
 {
     ASSERT(m_dataObject);
 }
@@ -111,6 +86,7 @@ Pasteboard::Pasteboard(GtkClipboard* gtkClipboard)
     , m_gtkClipboard(gtkClipboard)
 {
     ASSERT(m_dataObject);
+    PasteboardHelper::singleton().registerClipboard(gtkClipboard);
 }
 
 Pasteboard::~Pasteboard()
@@ -145,35 +121,25 @@ static ClipboardDataType dataObjectTypeFromHTMLClipboardType(const String& rawTy
     return ClipboardDataTypeUnknown;
 }
 
-bool Pasteboard::writeString(const String& type, const String& data)
+void Pasteboard::writeString(const String& type, const String& data)
 {
     switch (dataObjectTypeFromHTMLClipboardType(type)) {
     case ClipboardDataTypeURIList:
     case ClipboardDataTypeURL:
         m_dataObject->setURIList(data);
-        return true;
+        return;
     case ClipboardDataTypeMarkup:
         m_dataObject->setMarkup(data);
-        return true;
+        return;
     case ClipboardDataTypeText:
         m_dataObject->setText(data);
-        return true;
-    case ClipboardDataTypeImage:
+        return;
     case ClipboardDataTypeUnknown:
+        m_dataObject->setUnknownTypeData(type, data);
+        return;
+    case ClipboardDataTypeImage:
         break;
     }
-
-    return false;
-}
-
-void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame, ShouldSerializeSelectedTextForClipboard shouldSerializeSelectedTextForClipboard)
-{
-    m_dataObject->clearAll();
-    m_dataObject->setText(shouldSerializeSelectedTextForClipboard == IncludeImageAltTextForClipboard ? frame->editor().selectedTextForClipboard() : frame->editor().selectedText());
-    m_dataObject->setMarkup(createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs));
-
-    if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard, canSmartCopyOrDelete ? PasteboardHelper::IncludeSmartPaste : PasteboardHelper::DoNotIncludeSmartPaste);
 }
 
 void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartReplaceOption)
@@ -182,65 +148,44 @@ void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartRepl
     m_dataObject->setText(text);
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard, (smartReplaceOption == CanSmartReplace) ? PasteboardHelper::IncludeSmartPaste : PasteboardHelper::DoNotIncludeSmartPaste);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard, (smartReplaceOption == CanSmartReplace) ? PasteboardHelper::IncludeSmartPaste : PasteboardHelper::DoNotIncludeSmartPaste);
 }
 
-void Pasteboard::writeURL(const KURL& url, const String& label, Frame* frame)
+void Pasteboard::write(const PasteboardURL& pasteboardURL)
 {
-    ASSERT(!url.isEmpty());
+    ASSERT(!pasteboardURL.url.isEmpty());
 
     m_dataObject->clearAll();
-    m_dataObject->setURL(url, label);
+    m_dataObject->setURL(pasteboardURL.url, pasteboardURL.title);
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard);
 }
 
-static KURL getURLForImageNode(Node* node)
+void Pasteboard::write(const PasteboardImage& pasteboardImage)
 {
-    // FIXME: Later this code should be shared with Chromium somehow. Chances are all platforms want it.
-    AtomicString urlString;
-    if (isHTMLImageElement(node) || isHTMLInputElement(node))
-        urlString = toElement(node)->getAttribute(HTMLNames::srcAttr);
-#if ENABLE(SVG)
-    else if (node->hasTagName(SVGNames::imageTag))
-        urlString = toElement(node)->getAttribute(XLinkNames::hrefAttr);
-#endif
-    else if (node->hasTagName(HTMLNames::embedTag) || node->hasTagName(HTMLNames::objectTag)) {
-        Element* element = toElement(node);
-        urlString = element->imageSourceURL();
-    }
-    return urlString.isEmpty() ? KURL() : node->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
-}
-
-void Pasteboard::writeImage(Node* node, const KURL&, const String& title)
-{
-    ASSERT(node);
-
-    if (!(node->renderer() && node->renderer()->isImage()))
-        return;
-
-    RenderImage* renderer = toRenderImage(node->renderer());
-    CachedImage* cachedImage = renderer->cachedImage();
-    if (!cachedImage || cachedImage->errorOccurred())
-        return;
-    Image* image = cachedImage->imageForRenderer(renderer);
-    ASSERT(image);
-
     m_dataObject->clearAll();
-
-    KURL url = getURLForImageNode(node);
-    if (!url.isEmpty()) {
-        m_dataObject->setURL(url, title);
-
-        m_dataObject->setMarkup(createMarkup(toElement(node), IncludeNode, 0, ResolveAllURLs));
+    if (!pasteboardImage.url.url.isEmpty()) {
+        m_dataObject->setURL(pasteboardImage.url.url, pasteboardImage.url.title);
+        m_dataObject->setMarkup(pasteboardImage.url.markup);
     }
 
-    GRefPtr<GdkPixbuf> pixbuf = adoptGRef(image->getGdkPixbuf());
-    m_dataObject->setImage(pixbuf.get());
+    GRefPtr<GdkPixbuf> pixbuf = adoptGRef(pasteboardImage.image->getGdkPixbuf());
+    if (pixbuf)
+        m_dataObject->setImage(pixbuf.get());
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard);
+}
+
+void Pasteboard::write(const PasteboardWebContent& pasteboardContent)
+{
+    m_dataObject->clearAll();
+    m_dataObject->setText(pasteboardContent.text);
+    m_dataObject->setMarkup(pasteboardContent.markup);
+
+    if (m_gtkClipboard)
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard, pasteboardContent.canSmartCopyOrDelete ? PasteboardHelper::IncludeSmartPaste : PasteboardHelper::DoNotIncludeSmartPaste, pasteboardContent.callback.get());
 }
 
 void Pasteboard::writePasteboard(const Pasteboard& sourcePasteboard)
@@ -258,9 +203,13 @@ void Pasteboard::writePasteboard(const Pasteboard& sourcePasteboard)
         m_dataObject->setURIList(sourceDataObject->uriList());
     if (sourceDataObject->hasImage())
         m_dataObject->setImage(sourceDataObject->image());
+    if (sourceDataObject->hasUnknownTypeData()) {
+        for (auto& it : m_dataObject->unknownTypes())
+            m_dataObject->setUnknownTypeData(it.key, it.value);
+    }
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard);
 }
 
 void Pasteboard::clear()
@@ -272,7 +221,7 @@ void Pasteboard::clear()
     m_dataObject->clearAllExceptFilenames();
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard);
 }
 
 void Pasteboard::clear(const String& type)
@@ -297,92 +246,60 @@ void Pasteboard::clear(const String& type)
     }
 
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().writeClipboardContents(m_gtkClipboard);
 }
 
 bool Pasteboard::canSmartReplace()
 {
-    return m_gtkClipboard && PasteboardHelper::defaultPasteboardHelper()->clipboardContentSupportsSmartReplace(m_gtkClipboard);
+    return m_gtkClipboard && PasteboardHelper::singleton().clipboardContentSupportsSmartReplace(m_gtkClipboard);
 }
 
-void Pasteboard::setDragImage(DragImageRef, const IntPoint& hotSpot)
+#if ENABLE(DRAG_SUPPORT)
+void Pasteboard::setDragImage(DragImageRef, const IntPoint&)
 {
 }
+#endif
 
-PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefPtr<Range> context,
-                                                          bool allowPlainText, bool& chosePlainText)
-{
-    if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
-
-    chosePlainText = false;
-
-    if (m_dataObject->hasMarkup()) {
-        RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), m_dataObject->markup(), "", DisallowScriptingAndPluginContent);
-        if (fragment)
-            return fragment.release();
-    }
-
-    if (!allowPlainText)
-        return 0;
-
-    if (m_dataObject->hasText()) {
-        chosePlainText = true;
-        RefPtr<DocumentFragment> fragment = createFragmentFromText(context.get(), m_dataObject->text());
-        if (fragment)
-            return fragment.release();
-    }
-
-    return 0;
-}
-
-String Pasteboard::plainText(Frame* frame)
+void Pasteboard::read(PasteboardPlainText& text)
 {
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
-    return m_dataObject->text();
-}
-
-bool Pasteboard::isSelectionMode() const
-{
-    return PasteboardHelper::defaultPasteboardHelper()->usePrimarySelectionClipboard();
-}
-
-void Pasteboard::setSelectionMode(bool selectionMode)
-{
-    PasteboardHelper::defaultPasteboardHelper()->setUsePrimarySelectionClipboard(selectionMode);
+        PasteboardHelper::singleton().getClipboardContents(m_gtkClipboard);
+    text.text = m_dataObject->text();
 }
 
 bool Pasteboard::hasData()
 {
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().getClipboardContents(m_gtkClipboard);
 
-    return m_dataObject->hasText() || m_dataObject->hasMarkup() || m_dataObject->hasURIList() || m_dataObject->hasImage();
+    return m_dataObject->hasText() || m_dataObject->hasMarkup() || m_dataObject->hasURIList() || m_dataObject->hasImage() || m_dataObject->hasUnknownTypeData();
 }
 
-ListHashSet<String> Pasteboard::types()
+Vector<String> Pasteboard::types()
 {
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().getClipboardContents(m_gtkClipboard);
 
-    ListHashSet<String> types;
+    Vector<String> types;
     if (m_dataObject->hasText()) {
-        types.add("text/plain");
-        types.add("Text");
-        types.add("text");
+        types.append(ASCIILiteral("text/plain"));
+        types.append(ASCIILiteral("Text"));
+        types.append(ASCIILiteral("text"));
     }
 
     if (m_dataObject->hasMarkup())
-        types.add("text/html");
+        types.append(ASCIILiteral("text/html"));
 
     if (m_dataObject->hasURIList()) {
-        types.add("text/uri-list");
-        types.add("URL");
+        types.append(ASCIILiteral("text/uri-list"));
+        types.append(ASCIILiteral("URL"));
     }
 
     if (m_dataObject->hasFilenames())
-        types.add("Files");
+        types.append(ASCIILiteral("Files"));
+
+    for (auto& key : m_dataObject->unknownTypes().keys())
+        types.append(key);
 
     return types;
 }
@@ -390,7 +307,7 @@ ListHashSet<String> Pasteboard::types()
 String Pasteboard::readString(const String& type)
 {
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().getClipboardContents(m_gtkClipboard);
 
     switch (dataObjectTypeFromHTMLClipboardType(type)) {
     case ClipboardDataTypeURIList:
@@ -401,8 +318,9 @@ String Pasteboard::readString(const String& type)
         return m_dataObject->markup();
     case ClipboardDataTypeText:
         return m_dataObject->text();
-    case ClipboardDataTypeImage:
     case ClipboardDataTypeUnknown:
+        return m_dataObject->unknownTypeData(type);
+    case ClipboardDataTypeImage:
         break;
     }
 
@@ -412,7 +330,7 @@ String Pasteboard::readString(const String& type)
 Vector<String> Pasteboard::readFilenames()
 {
     if (m_gtkClipboard)
-        PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_gtkClipboard);
+        PasteboardHelper::singleton().getClipboardContents(m_gtkClipboard);
 
     return m_dataObject->filenames();
 }

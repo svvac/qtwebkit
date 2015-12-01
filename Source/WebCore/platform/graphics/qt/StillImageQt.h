@@ -39,7 +39,7 @@ namespace WebCore {
             return adoptRef(new StillImage(pixmap));
         }
 
-        static PassRefPtr<StillImage> createForRendering(const QPixmap* pixmap)
+        static RefPtr<StillImage> createForRendering(const QPixmap* pixmap)
         {
             return adoptRef(new StillImage(pixmap));
         }
@@ -51,9 +51,9 @@ namespace WebCore {
         virtual void destroyDecodedData(bool destroyAll = true) { Q_UNUSED(destroyAll); }
         virtual unsigned decodedSize() const { return 0; }
 
-        virtual IntSize size() const;
+        virtual FloatSize size() const;
         virtual PassNativeImagePtr nativeImageForCurrentFrame();
-        virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode);
+        virtual void draw(GraphicsContext&, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode, ImageOrientationDescription);
 
     private:
         StillImage(const QPixmap&);

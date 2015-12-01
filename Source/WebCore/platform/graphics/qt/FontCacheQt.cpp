@@ -34,6 +34,8 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+#include "NotImplemented.h"
+
 #include <QFont>
 #include <QFontDatabase>
 #include <QTextLayout>
@@ -63,33 +65,45 @@ static QRawFont rawFontForCharacters(const QString& string, const QRawFont& font
     return glyphs.rawFont();
 }
 
-PassRefPtr<SimpleFontData> FontCache::systemFallbackForCharacters(const FontDescription&, const SimpleFontData* originalFontData, bool, const UChar* characters, int length)
+RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& description, const Font* originalFontData, bool, const UChar* characters, unsigned length)
 {
+    RefPtr<Font> fontData;
     QString qstring = QString::fromRawData(reinterpret_cast<const QChar*>(characters), length);
-    QRawFont computedFont = rawFontForCharacters(qstring, originalFontData->getQtRawFont());
+    QRawFont computedFont = rawFontForCharacters(qstring, originalFontData->rawFont());
     if (!computedFont.isValid())
         return 0;
-    FontPlatformData alternateFont(computedFont);
-    return getCachedFontData(&alternateFont, DoNotRetain);
+
+    FontPlatformData* result = getCachedFontPlatformData(description, computedFont.familyName());
+    if (result) {
+      fontData = fontForPlatformData(*result);
+    }
+
+    return fontData.release();
 }
 
-PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
-{
-    const AtomicString fallbackFamily = QFont(fontDescription.firstFamily()).lastResortFamily();
-    FontPlatformData platformData(fontDescription, fallbackFamily);
-    return getCachedFontData(&platformData, shouldRetain);
-}
-
-void FontCache::getTraitsInFamily(const AtomicString&, Vector<unsigned>&)
-{
-}
-
-PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& familyName)
+std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& familyName)
 {
     QFontDatabase db;
     if (!db.hasFamily(familyName))
         return nullptr;
-    return adoptPtr(new FontPlatformData(fontDescription, familyName));
+    return std::make_unique<FontPlatformData>(fontDescription, familyName);
 }
 
-} // namespace WebCore
+Vector<FontTraitsMask> FontCache::getTraitsInFamily(const AtomicString& familyName)
+{
+    notImplemented();
+    Vector<FontTraitsMask> traits;
+    return traits;
+}
+
+Ref<Font> FontCache::lastResortFallbackFont(const FontDescription& fontDescription)
+{
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, fallbackFontName, ());
+    if (!fallbackFontName.isEmpty())
+        return *fontForFamily(fontDescription, fallbackFontName);
+
+    static AtomicString timesStr("serif");
+    return *fontForFamily(fontDescription, timesStr, false);
+}
+
+}// namespace WebCore

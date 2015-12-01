@@ -31,6 +31,7 @@
 #ifndef ScopedEventQueue_h
 #define ScopedEventQueue_h
 
+#include <wtf/NeverDestroyed.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -38,37 +39,36 @@
 
 namespace WebCore {
 
-class EventDispatchMediator;
+class Event;
+class EventQueueScope;
 
 class ScopedEventQueue {
     WTF_MAKE_NONCOPYABLE(ScopedEventQueue); WTF_MAKE_FAST_ALLOCATED;
 public:
-    ~ScopedEventQueue();
+    static ScopedEventQueue& singleton();
+    void enqueueEvent(PassRefPtr<Event>);
 
-    void enqueueEventDispatchMediator(PassRefPtr<EventDispatchMediator>);
+private:
+    ScopedEventQueue() = default;
+    ~ScopedEventQueue() = delete;
+
+    void dispatchEvent(PassRefPtr<Event>) const;
     void dispatchAllEvents();
-    static ScopedEventQueue* instance();
-
     void incrementScopingLevel();
     void decrementScopingLevel();
 
-private:
-    ScopedEventQueue();
-    static void initialize();
-    void dispatchEvent(PassRefPtr<EventDispatchMediator>) const;
+    Vector<RefPtr<Event>> m_queuedEvents;
+    unsigned m_scopingLevel { 0 };
 
-    Vector<RefPtr<EventDispatchMediator> > m_queuedEventDispatchMediators;
-    unsigned m_scopingLevel;
-
-    static ScopedEventQueue* s_instance;
+    friend class WTF::NeverDestroyed<WebCore::ScopedEventQueue>;
+    friend class EventQueueScope;
 };
 
 class EventQueueScope {
     WTF_MAKE_NONCOPYABLE(EventQueueScope);
-
 public:
-    EventQueueScope() { ScopedEventQueue::instance()->incrementScopingLevel(); }
-    ~EventQueueScope() { ScopedEventQueue::instance()->decrementScopingLevel(); }
+    EventQueueScope() { ScopedEventQueue::singleton().incrementScopingLevel(); }
+    ~EventQueueScope() { ScopedEventQueue::singleton().decrementScopingLevel(); }
 };
 
 }

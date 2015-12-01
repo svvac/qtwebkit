@@ -22,9 +22,9 @@
 #ifndef FontCustomPlatformData_h
 #define FontCustomPlatformData_h
 
-#include "FontOrientation.h"
-#include "FontRenderingMode.h"
-#include "FontWidthVariant.h"
+#if USE(CAIRO)
+
+#include "TextFlags.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
@@ -33,24 +33,26 @@ typedef struct _cairo_font_face cairo_font_face_t;
 
 namespace WebCore {
 
+class FontDescription;
 class FontPlatformData;
 class SharedBuffer;
 
 struct FontCustomPlatformData {
     WTF_MAKE_NONCOPYABLE(FontCustomPlatformData);
 public:
-    FontCustomPlatformData(FT_Face, SharedBuffer*);
+    FontCustomPlatformData(FT_Face, SharedBuffer&);
     ~FontCustomPlatformData();
-    FontPlatformData fontPlatformData(int size, bool bold, bool italic, FontOrientation = Horizontal, FontWidthVariant = RegularWidth, FontRenderingMode = NormalRenderingMode);
+    FontPlatformData fontPlatformData(const FontDescription&, bool bold, bool italic);
     static bool supportsFormat(const String&);
 
 private:
-    FT_Face m_freeTypeFace;
     cairo_font_face_t* m_fontFace;
 };
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer);
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer&);
 
-}
+} // namespace WebCore
 
-#endif
+#endif // USE(CAIRO)
+
+#endif // FontCustomPlatformData_h

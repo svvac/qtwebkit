@@ -31,6 +31,8 @@
 
 #include <QList>
 #include <QNetworkAccessManager>
+#include <QPointer>
+#include <QPixmap>
 #include <QRect>
 #include <QSize>
 #include <QUrl>
@@ -43,6 +45,7 @@ class Frame;
 class GraphicsContext;
 class IntRect;
 class TextureMapperLayer;
+class ScrollableArea;
 }
 
 QT_BEGIN_NAMESPACE
@@ -56,7 +59,7 @@ class QWebFrame;
 class QWebPageAdapter;
 class QWebSecurityOrigin;
 
-class WEBKIT_EXPORTDATA QWebHitTestResultPrivate {
+class QWebHitTestResultPrivate {
 public:
     QWebHitTestResultPrivate()
         : isContentEditable(false)
@@ -113,7 +116,7 @@ public:
     int marginHeight;
 };
 
-class WEBKIT_EXPORTDATA QWebFrameAdapter {
+class QWebFrameAdapter {
 public:
     enum ValueOwnership {
         QtOwnership,
@@ -238,8 +241,9 @@ public:
 // private:
     void init(QWebPageAdapter*);
     void init(QWebPageAdapter*, QWebFrameData*);
-    WebCore::Scrollbar* horizontalScrollBar() const;
-    WebCore::Scrollbar* verticalScrollBar() const;
+    WebCore::ScrollableArea* scrollableArea() const;
+    //WebCore::Scrollbar* horizontalScrollBar() const;
+    //WebCore::Scrollbar* verticalScrollBar() const;
 
     WebCore::Frame *frame;
     WebCore::FrameLoaderClientQt *frameLoaderClient;

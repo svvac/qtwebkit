@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,20 +26,19 @@
 #include "config.h"
 #include "UserContentURLPattern.h"
 
-#include "KURL.h"
+#include "URL.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
-bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String>& whitelist, const Vector<String>& blacklist)
+bool UserContentURLPattern::matchesPatterns(const URL& url, const Vector<String>& whitelist, const Vector<String>& blacklist)
 {
     // In order for a URL to be a match it has to be present in the whitelist and not present in the blacklist.
     // If there is no whitelist at all, then all URLs are assumed to be in the whitelist.
     bool matchesWhitelist = whitelist.isEmpty();
     if (!matchesWhitelist) {
-        size_t whitelistSize = whitelist.size();
-        for (size_t i = 0; i < whitelistSize; ++i) {
-            UserContentURLPattern contentPattern(whitelist[i]);
+        for (auto& entry : whitelist) {
+            UserContentURLPattern contentPattern(entry);
             if (contentPattern.matches(url)) {
                 matchesWhitelist = true;
                 break;
@@ -49,9 +48,8 @@ bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String
 
     bool matchesBlacklist = false;
     if (!blacklist.isEmpty()) {
-        size_t blacklistSize = blacklist.size();
-        for (size_t i = 0; i < blacklistSize; ++i) {
-            UserContentURLPattern contentPattern(blacklist[i]);
+        for (auto& entry : blacklist) {
+            UserContentURLPattern contentPattern(entry);
             if (contentPattern.matches(url)) {
                 matchesBlacklist = true;
                 break;
@@ -64,7 +62,7 @@ bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String
 
 bool UserContentURLPattern::parse(const String& pattern)
 {
-    DEFINE_STATIC_LOCAL(const String, schemeSeparator, (ASCIILiteral("://")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, schemeSeparator, (ASCIILiteral("://")));
 
     size_t schemeEndPos = pattern.find(schemeSeparator);
     if (schemeEndPos == notFound)
@@ -81,7 +79,7 @@ bool UserContentURLPattern::parse(const String& pattern)
     if (equalIgnoringCase(m_scheme, "file"))
         pathStartPos = hostStartPos;
     else {
-        size_t hostEndPos = pattern.find("/", hostStartPos);
+        size_t hostEndPos = pattern.find('/', hostStartPos);
         if (hostEndPos == notFound)
             return false;
 
@@ -99,7 +97,7 @@ bool UserContentURLPattern::parse(const String& pattern)
         }
 
         // No other '*' can occur in the host.
-        if (m_host.find("*") != notFound)
+        if (m_host.find('*') != notFound)
             return false;
 
         pathStartPos = hostEndPos;
@@ -110,7 +108,7 @@ bool UserContentURLPattern::parse(const String& pattern)
     return true;
 }
 
-bool UserContentURLPattern::matches(const KURL& test) const
+bool UserContentURLPattern::matches(const URL& test) const
 {
     if (m_invalid)
         return false;
@@ -124,7 +122,7 @@ bool UserContentURLPattern::matches(const KURL& test) const
     return matchesPath(test);
 }
 
-bool UserContentURLPattern::matchesHost(const KURL& test) const
+bool UserContentURLPattern::matchesHost(const URL& test) const
 {
     const String& host = test.host();
     if (equalIgnoringCase(host, m_host))
@@ -225,7 +223,7 @@ struct MatchTester
     }
 };
 
-bool UserContentURLPattern::matchesPath(const KURL& test) const
+bool UserContentURLPattern::matchesPath(const URL& test) const
 {
     MatchTester match(m_path, test.path());
     return match.test();

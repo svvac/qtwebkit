@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,9 +26,11 @@
 #ifndef CurlDownload_h
 #define CurlDownload_h
 
-#include <WebCore/FileSystem.h>
-#include <WebCore/ResourceHandle.h>
-#include <WebCore/ResourceResponse.h>
+#include "FileSystem.h"
+#include "ResourceHandle.h"
+#include "ResourceResponse.h"
+#include <wtf/Lock.h>
+#include <wtf/Threading.h>
 
 #if PLATFORM(WIN)
 #include <windows.h>
@@ -59,8 +61,8 @@ private:
 
     CURLM* getMultiHandle() const { return m_curlMultiHandle; }
 
-    bool runThread() const { return m_runThread; }
-    void setRunThread(bool runThread) { m_runThread = runThread; }
+    bool runThread() const { LockHolder locker(m_mutex); return m_runThread; }
+    void setRunThread(bool runThread) { LockHolder locker(m_mutex); m_runThread = runThread; }
 
     bool addToCurl(CURL* curlHandle);
     bool removeFromCurl(CURL* curlHandle);
@@ -69,10 +71,10 @@ private:
 
     ThreadIdentifier m_threadId;
     CURLM* m_curlMultiHandle;
-    int m_activeDownloadCount;
     Vector<CURL*> m_pendingHandleList;
+    Vector<CURL*> m_activeHandleList;
     Vector<CURL*> m_removedHandleList;
-    mutable Mutex m_mutex;
+    mutable Lock m_mutex;
     bool m_runThread;
 };
 
@@ -84,13 +86,15 @@ public:
     virtual void didFail() { }
 };
 
-class CurlDownload {
+class CurlDownload : public ThreadSafeRefCounted<CurlDownload> {
 public:
     CurlDownload();
     ~CurlDownload();
 
-    void init(CurlDownloadListener*, const WebCore::KURL&);
+    void init(CurlDownloadListener*, const WebCore::URL&);
     void init(CurlDownloadListener*, ResourceHandle*, const ResourceRequest&, const ResourceResponse&);
+
+    void setListener(CurlDownloadListener* listener) { m_listener = listener; }
 
     bool start();
     bool cancel();
@@ -137,7 +141,7 @@ private:
     WebCore::PlatformFileHandle m_tempHandle;
     WebCore::ResourceResponse m_response;
     bool m_deletesFileUponFailure;
-    mutable Mutex m_mutex;
+    mutable Lock m_mutex;
     CurlDownloadListener *m_listener;
 
     static CurlDownloadManager m_downloadManager;

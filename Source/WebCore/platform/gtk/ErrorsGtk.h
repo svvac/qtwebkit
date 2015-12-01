@@ -24,10 +24,10 @@
 
 namespace WebCore {
 
-class PrintContext;
 class ResourceError;
 class ResourceRequest;
 class ResourceResponse;
+class URL;
 
 const char* const errorDomainNetwork = "WebKitNetworkError";
 const char* const errorDomainPolicy = "WebKitPolicyError";
@@ -49,7 +49,8 @@ enum PolicyError {
     PolicyErrorCannotShowMimeType = 100,
     PolicyErrorCannotShowURL = 101,
     PolicyErrorFrameLoadInterruptedByPolicyChange = 102,
-    PolicyErrorCannotUseRestrictedPort = 103
+    PolicyErrorCannotUseRestrictedPort = 103,
+    PolicyErrorBlockedByContentBlocker = 104,
 };
 
 enum PluginError {
@@ -75,6 +76,7 @@ enum PrintError {
 
 ResourceError cancelledError(const ResourceRequest&);
 ResourceError blockedError(const ResourceRequest&);
+ResourceError blockedByContentBlockerError(const ResourceRequest&);
 ResourceError cannotShowURLError(const ResourceRequest&);
 ResourceError interruptedForPolicyChangeError(const ResourceRequest&);
 ResourceError cannotShowMIMETypeError(const ResourceResponse&);
@@ -83,9 +85,9 @@ ResourceError pluginWillHandleLoadError(const ResourceResponse&);
 ResourceError downloadNetworkError(const ResourceError&);
 ResourceError downloadCancelledByUserError(const ResourceResponse&);
 ResourceError downloadDestinationError(const ResourceResponse&, const String& errorMessage);
-ResourceError printError(const PrintContext*, const String& errorMessage);
-ResourceError printerNotFoundError(const PrintContext*);
-ResourceError invalidPageRangeToPrint(const PrintContext*);
+ResourceError printError(const URL& failingURL, const String& errorMessage);
+ResourceError printerNotFoundError(const URL& failingURL);
+ResourceError invalidPageRangeToPrint(const URL& failingURL);
 
 }
 

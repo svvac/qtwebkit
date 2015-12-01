@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,13 +28,13 @@
 
 #if ENABLE(DRAG_SUPPORT)
 #import "BitmapImage.h"
-#import "Font.h"
-#import "FontCache.h"
+#import "CoreGraphicsSPI.h"
+#import "FontCascade.h"
 #import "FontDescription.h"
 #import "FontSelector.h"
 #import "GraphicsContext.h"
 #import "Image.h"
-#import "KURL.h"
+#import "URL.h"
 #import "ResourceResponse.h"
 #import "StringTruncator.h"
 #import "TextRun.h"
@@ -58,7 +58,10 @@ RetainPtr<NSImage> scaleDragImage(RetainPtr<NSImage> image, FloatSize scale)
     NSSize newSize = NSMakeSize((originalSize.width * scale.width()), (originalSize.height * scale.height()));
     newSize.width = roundf(newSize.width);
     newSize.height = roundf(newSize.height);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [image.get() setScalesWhenResized:YES];
+#pragma clang diagnostic pop
     [image.get() setSize:newSize];
     return image;
 }
@@ -77,17 +80,17 @@ RetainPtr<NSImage> dissolveDragImageToFraction(RetainPtr<NSImage> image, float d
     return dissolvedImage;
 }
         
-RetainPtr<NSImage> createDragImageFromImage(Image* image, RespectImageOrientationEnum shouldRespectImageOrientation)
+RetainPtr<NSImage> createDragImageFromImage(Image* image, ImageOrientationDescription description)
 {
-    IntSize size = image->size();
+    FloatSize size = image->size();
 
-    if (image->isBitmapImage()) {
-        ImageOrientation orientation = DefaultImageOrientation;
-        BitmapImage* bitmapImage = static_cast<BitmapImage *>(image);
-        IntSize sizeRespectingOrientation = bitmapImage->sizeRespectingOrientation();
+    if (is<BitmapImage>(*image)) {
+        ImageOrientation orientation;
+        BitmapImage& bitmapImage = downcast<BitmapImage>(*image);
+        IntSize sizeRespectingOrientation = bitmapImage.sizeRespectingOrientation(description);
 
-        if (shouldRespectImageOrientation == RespectImageOrientation)
-            orientation = bitmapImage->currentFrameOrientation();
+        if (description.respectImageOrientation() == RespectImageOrientation)
+            orientation = bitmapImage.orientationForCurrentFrame();
 
         if (orientation != DefaultImageOrientation) {
             // Construct a correctly-rotated copy of the image to use as the drag image.
@@ -154,10 +157,10 @@ const float DragLinkUrlFontSize = 10;
 
 // FIXME - we should move all the functionality of NSString extras to WebCore
     
-static Font& fontFromNSFont(NSFont *font)
+static FontCascade& fontFromNSFont(NSFont *font)
 {
     static NSFont *currentFont;
-    DEFINE_STATIC_LOCAL(Font, currentRenderer, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(FontCascade, currentRenderer, ());
     
     if ([font isEqual:currentFont])
         return currentRenderer;
@@ -165,8 +168,7 @@ static Font& fontFromNSFont(NSFont *font)
         CFRelease(currentFont);
     currentFont = font;
     CFRetain(currentFont);
-    FontPlatformData f(font, [font pointSize]);
-    currentRenderer = Font(f, ![[NSGraphicsContext currentContext] isDrawingToScreen]);
+    currentRenderer = FontCascade(FontPlatformData(toCTFont(font), [font pointSize]));
     return currentRenderer;
 }
 
@@ -189,22 +191,13 @@ static float widthWithFont(NSString *string, NSFont *font)
     [string getCharacters:buffer.data()];
     
     if (canUseFastRenderer(buffer.data(), length)) {
-        FontCachePurgePreventer fontCachePurgePreventer;
-
-        Font webCoreFont(FontPlatformData(font, [font pointSize]), ![[NSGraphicsContext currentContext] isDrawingToScreen]);
-        TextRun run(buffer.data(), length);
+        FontCascade webCoreFont(FontPlatformData(toCTFont(font), [font pointSize]));
+        TextRun run(StringView(buffer.data(), length));
         run.disableRoundingHacks();
         return webCoreFont.width(run);
     }
     
     return [string sizeWithAttributes:[NSDictionary dictionaryWithObjectsAndKeys:font, NSFontAttributeName, nil]].width;
-}
-
-static inline CGFloat webkit_CGCeiling(CGFloat value)
-{
-    if (sizeof(value) == sizeof(float))
-        return ceilf(value);
-    return static_cast<CGFloat>(ceil(value));
 }
     
 static void drawAtPoint(NSString *string, NSPoint point, NSFont *font, NSColor *textColor)
@@ -215,13 +208,11 @@ static void drawAtPoint(NSString *string, NSPoint point, NSFont *font, NSColor *
     [string getCharacters:buffer.data()];
     
     if (canUseFastRenderer(buffer.data(), length)) {
-        FontCachePurgePreventer fontCachePurgePreventer;
-
         // The following is a half-assed attempt to match AppKit's rounding rules for drawAtPoint.
         // It's probably incorrect for high DPI.
         // If you change this, be sure to test all the text drawn this way in Safari, including
         // the status bar, bookmarks bar, tab bar, and activity window.
-        point.y = webkit_CGCeiling(point.y);
+        point.y = CGCeiling(point.y);
         
         NSGraphicsContext *nsContext = [NSGraphicsContext currentContext];
         CGContextRef cgContext = static_cast<CGContextRef>([nsContext graphicsPort]);
@@ -232,8 +223,8 @@ static void drawAtPoint(NSString *string, NSPoint point, NSFont *font, NSColor *
         if (!flipped)
             CGContextScaleCTM(cgContext, 1, -1);
             
-        Font webCoreFont(FontPlatformData(font, [font pointSize]), ![nsContext isDrawingToScreen], Antialiased);
-        TextRun run(buffer.data(), length);
+        FontCascade webCoreFont(FontPlatformData(toCTFont(font), [font pointSize]), Antialiased);
+        TextRun run(StringView(buffer.data(), length));
         run.disableRoundingHacks();
 
         CGFloat red;
@@ -243,7 +234,7 @@ static void drawAtPoint(NSString *string, NSPoint point, NSFont *font, NSColor *
         [[textColor colorUsingColorSpaceName:NSDeviceRGBColorSpace] getRed:&red green:&green blue:&blue alpha:&alpha];
         graphicsContext.setFillColor(makeRGBA(red * 255, green * 255, blue * 255, alpha * 255), ColorSpaceDeviceRGB);
         
-        webCoreFont.drawText(&graphicsContext, run, FloatPoint(point.x, (flipped ? point.y : (-1 * point.y))));
+        webCoreFont.drawText(graphicsContext, run, FloatPoint(point.x, (flipped ? point.y : (-1 * point.y))));
         
         if (!flipped)
             CGContextScaleCTM(cgContext, 1, -1);
@@ -267,7 +258,7 @@ static void drawDoubledAtPoint(NSString *string, NSPoint textPoint, NSColor *top
         drawAtPoint(string, textPoint, font, topColor);
 }
 
-DragImageRef createDragImageForLink(KURL& url, const String& title, FontRenderingMode)
+DragImageRef createDragImageForLink(URL& url, const String& title, FontRenderingMode)
 {
     NSString *label = nsStringNilIfEmpty(title);
     NSURL *cocoaURL = url;

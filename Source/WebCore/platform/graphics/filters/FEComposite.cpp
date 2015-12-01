@@ -22,21 +22,18 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEComposite.h"
 
 #include "FECompositeArithmeticNEON.h"
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
-#include <wtf/Uint8ClampedArray.h>
+#include <runtime/Uint8ClampedArray.h>
 
 namespace WebCore {
 
-FEComposite::FEComposite(Filter* filter, const CompositeOperationType& type, float k1, float k2, float k3, float k4)
+FEComposite::FEComposite(Filter& filter, const CompositeOperationType& type, float k1, float k2, float k3, float k4)
     : FilterEffect(filter)
     , m_type(type)
     , m_k1(k1)
@@ -46,9 +43,9 @@ FEComposite::FEComposite(Filter* filter, const CompositeOperationType& type, flo
 {
 }
 
-PassRefPtr<FEComposite> FEComposite::create(Filter* filter, const CompositeOperationType& type, float k1, float k2, float k3, float k4)
+Ref<FEComposite> FEComposite::create(Filter& filter, const CompositeOperationType& type, float k1, float k2, float k3, float k4)
 {
-    return adoptRef(new FEComposite(filter, type, k1, k2, k3, k4));
+    return adoptRef(*new FEComposite(filter, type, k1, k2, k3, k4));
 }
 
 CompositeOperationType FEComposite::operation() const
@@ -182,6 +179,7 @@ static inline void computeArithmeticPixelsUnclamped(unsigned char* source, unsig
     }
 }
 
+#if !HAVE(ARM_NEON_INTRINSICS)
 static inline void arithmeticSoftware(unsigned char* source, unsigned char* destination, int pixelArrayLength, float k1, float k2, float k3, float k4)
 {
     float upperLimit = std::max(0.0f, k1) + std::max(0.0f, k2) + std::max(0.0f, k3) + k4;
@@ -213,6 +211,7 @@ static inline void arithmeticSoftware(unsigned char* source, unsigned char* dest
             computeArithmeticPixels<0, 0>(source, destination, pixelArrayLength, k1, k2, k3, k4);
     }
 }
+#endif
 
 inline void FEComposite::platformArithmeticSoftware(Uint8ClampedArray* source, Uint8ClampedArray* destination,
     float k1, float k2, float k3, float k4)
@@ -236,6 +235,7 @@ void FEComposite::determineAbsolutePaintRect()
         // For In and Atop the first effect just influences the result of
         // the second effect. So just use the absolute paint rect of the second effect here.
         setAbsolutePaintRect(inputEffect(1)->absolutePaintRect());
+        clipAbsolutePaintRect();
         return;
     case FECOMPOSITE_OPERATOR_ARITHMETIC:
         // Arithmetic may influnce the compele filter primitive region. So we can't
@@ -272,17 +272,17 @@ void FEComposite::platformApplySoftware()
     ImageBuffer* resultImage = createImageBufferResult();
     if (!resultImage)
         return;
-    GraphicsContext* filterContext = resultImage->context();
+    GraphicsContext& filterContext = resultImage->context();
 
     ImageBuffer* imageBuffer = in->asImageBuffer();
     ImageBuffer* imageBuffer2 = in2->asImageBuffer();
-    ASSERT(imageBuffer);
-    ASSERT(imageBuffer2);
+    if (!imageBuffer || !imageBuffer2)
+        return;
 
     switch (m_type) {
     case FECOMPOSITE_OPERATOR_OVER:
-        filterContext->drawImageBuffer(imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
-        filterContext->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
+        filterContext.drawImageBuffer(*imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
+        filterContext.drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
         break;
     case FECOMPOSITE_OPERATOR_IN: {
         // Applies only to the intersected region.
@@ -291,26 +291,24 @@ void FEComposite::platformApplySoftware()
         destinationRect.intersect(absolutePaintRect());
         if (destinationRect.isEmpty())
             break;
-        IntPoint destinationPoint(destinationRect.x() - absolutePaintRect().x(), destinationRect.y() - absolutePaintRect().y());
-        IntRect sourceRect(IntPoint(destinationRect.x() - in->absolutePaintRect().x(),
-                                    destinationRect.y() - in->absolutePaintRect().y()), destinationRect.size());
-        IntRect source2Rect(IntPoint(destinationRect.x() - in2->absolutePaintRect().x(),
-                                     destinationRect.y() - in2->absolutePaintRect().y()), destinationRect.size());
-        filterContext->drawImageBuffer(imageBuffer2, ColorSpaceDeviceRGB, destinationPoint, source2Rect);
-        filterContext->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, destinationPoint, sourceRect, CompositeSourceIn);
+        IntRect adjustedDestinationRect = destinationRect - absolutePaintRect().location();
+        IntRect sourceRect = destinationRect - in->absolutePaintRect().location();
+        IntRect source2Rect = destinationRect - in2->absolutePaintRect().location();
+        filterContext.drawImageBuffer(*imageBuffer2, ColorSpaceDeviceRGB, adjustedDestinationRect, source2Rect);
+        filterContext.drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, adjustedDestinationRect, sourceRect, CompositeSourceIn);
         break;
     }
     case FECOMPOSITE_OPERATOR_OUT:
-        filterContext->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
-        filterContext->drawImageBuffer(imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()), IntRect(IntPoint(), imageBuffer2->logicalSize()), CompositeDestinationOut);
+        filterContext.drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
+        filterContext.drawImageBuffer(*imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()), IntRect(IntPoint(), imageBuffer2->logicalSize()), CompositeDestinationOut);
         break;
     case FECOMPOSITE_OPERATOR_ATOP:
-        filterContext->drawImageBuffer(imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
-        filterContext->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()), IntRect(IntPoint(), imageBuffer->logicalSize()), CompositeSourceAtop);
+        filterContext.drawImageBuffer(*imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
+        filterContext.drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()), IntRect(IntPoint(), imageBuffer->logicalSize()), CompositeSourceAtop);
         break;
     case FECOMPOSITE_OPERATOR_XOR:
-        filterContext->drawImageBuffer(imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
-        filterContext->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()), IntRect(IntPoint(), imageBuffer->logicalSize()), CompositeXOR);
+        filterContext.drawImageBuffer(*imageBuffer2, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in2->absolutePaintRect()));
+        filterContext.drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()), IntRect(IntPoint(), imageBuffer->logicalSize()), CompositeXOR);
         break;
     default:
         break;
@@ -364,5 +362,3 @@ TextStream& FEComposite::externalRepresentation(TextStream& ts, int indent) cons
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

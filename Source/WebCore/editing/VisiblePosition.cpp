@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -120,7 +120,7 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
         if (!box)
             return primaryDirection == LTR ? previousVisuallyDistinctCandidate(m_deepPosition) : nextVisuallyDistinctCandidate(m_deepPosition);
 
-        RenderObject* renderer = box->renderer();
+        RenderObject* renderer = &box->renderer();
 
         while (true) {
             if ((renderer->isReplaced() || renderer->isBR()) && offset == box->caretRightmostOffset())
@@ -130,7 +130,7 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
                 box = box->prevLeafChild();
                 if (!box)
                     return primaryDirection == LTR ? previousVisuallyDistinctCandidate(m_deepPosition) : nextVisuallyDistinctCandidate(m_deepPosition);
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretRightmostOffset();
                 continue;
             }
@@ -154,14 +154,14 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
                     InlineBox* boxOnLeft;
                     int offsetOnLeft;
                     positionOnLeft.getInlineBoxAndOffset(m_affinity, primaryDirection, boxOnLeft, offsetOnLeft);
-                    if (boxOnLeft && boxOnLeft->root() == box->root())
+                    if (boxOnLeft && &boxOnLeft->root() == &box->root())
                         return Position();
                     return positionOnLeft;
                 }
 
                 // Reposition at the other logical position corresponding to our edge's visual position and go for another round.
                 box = prevBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = prevBox->caretRightmostOffset();
                 continue;
             }
@@ -173,10 +173,10 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
 
             if (box->direction() == primaryDirection) {
                 if (!prevBox) {
-                    InlineBox* logicalStart = 0;
-                    if (primaryDirection == LTR ? box->root()->getLogicalStartBoxWithNode(logicalStart) : box->root()->getLogicalEndBoxWithNode(logicalStart)) {
+                    InlineBox* logicalStart = nullptr;
+                    if (primaryDirection == LTR ? box->root().getLogicalStartBoxWithNode(logicalStart) : box->root().getLogicalEndBoxWithNode(logicalStart)) {
                         box = logicalStart;
-                        renderer = box->renderer();
+                        renderer = &box->renderer();
                         offset = primaryDirection == LTR ? box->caretMinOffset() : box->caretMaxOffset();
                     }
                     break;
@@ -195,19 +195,19 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
                     break;
 
                 box = prevBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretRightmostOffset();
                 if (box->direction() == primaryDirection)
                     break;
                 continue;
             }
 
-            while (prevBox && !prevBox->renderer()->node())
+            while (prevBox && !prevBox->renderer().node())
                 prevBox = prevBox->prevLeafChild();
 
             if (prevBox) {
                 box = prevBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretRightmostOffset();
                 if (box->bidiLevel() > level) {
                     do {
@@ -237,7 +237,7 @@ Position VisiblePosition::leftVisuallyDistinctCandidate() const
                         break;
                     level = box->bidiLevel();
                 }
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = primaryDirection == LTR ? box->caretMinOffset() : box->caretMaxOffset();
             }
             break;
@@ -285,7 +285,7 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
         if (!box)
             return primaryDirection == LTR ? nextVisuallyDistinctCandidate(m_deepPosition) : previousVisuallyDistinctCandidate(m_deepPosition);
 
-        RenderObject* renderer = box->renderer();
+        RenderObject* renderer = &box->renderer();
 
         while (true) {
             if ((renderer->isReplaced() || renderer->isBR()) && offset == box->caretLeftmostOffset())
@@ -295,7 +295,7 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
                 box = box->nextLeafChild();
                 if (!box)
                     return primaryDirection == LTR ? nextVisuallyDistinctCandidate(m_deepPosition) : previousVisuallyDistinctCandidate(m_deepPosition);
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretLeftmostOffset();
                 continue;
             }
@@ -319,14 +319,14 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
                     InlineBox* boxOnRight;
                     int offsetOnRight;
                     positionOnRight.getInlineBoxAndOffset(m_affinity, primaryDirection, boxOnRight, offsetOnRight);
-                    if (boxOnRight && boxOnRight->root() == box->root())
+                    if (boxOnRight && &boxOnRight->root() == &box->root())
                         return Position();
                     return positionOnRight;
                 }
 
                 // Reposition at the other logical position corresponding to our edge's visual position and go for another round.
                 box = nextBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = nextBox->caretLeftmostOffset();
                 continue;
             }
@@ -338,10 +338,10 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
 
             if (box->direction() == primaryDirection) {
                 if (!nextBox) {
-                    InlineBox* logicalEnd = 0;
-                    if (primaryDirection == LTR ? box->root()->getLogicalEndBoxWithNode(logicalEnd) : box->root()->getLogicalStartBoxWithNode(logicalEnd)) {
+                    InlineBox* logicalEnd = nullptr;
+                    if (primaryDirection == LTR ? box->root().getLogicalEndBoxWithNode(logicalEnd) : box->root().getLogicalStartBoxWithNode(logicalEnd)) {
                         box = logicalEnd;
-                        renderer = box->renderer();
+                        renderer = &box->renderer();
                         offset = primaryDirection == LTR ? box->caretMaxOffset() : box->caretMinOffset();
                     }
                     break;
@@ -362,19 +362,19 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
 
                 // For example, abc 123 ^ CBA or 123 ^ CBA abc
                 box = nextBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretLeftmostOffset();
                 if (box->direction() == primaryDirection)
                     break;
                 continue;
             }
 
-            while (nextBox && !nextBox->renderer()->node())
+            while (nextBox && !nextBox->renderer().node())
                 nextBox = nextBox->nextLeafChild();
 
             if (nextBox) {
                 box = nextBox;
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = box->caretLeftmostOffset();
 
                 if (box->bidiLevel() > level) {
@@ -405,7 +405,7 @@ Position VisiblePosition::rightVisuallyDistinctCandidate() const
                         break;
                     level = box->bidiLevel();
                 }
-                renderer = box->renderer();
+                renderer = &box->renderer();
                 offset = primaryDirection == LTR ? box->caretMaxOffset() : box->caretMinOffset();
             }
             break;
@@ -536,8 +536,11 @@ Position VisiblePosition::canonicalPosition(const Position& passedPosition)
 
     // The new position must be in the same editable element. Enforce that first.
     // Unless the descent is from a non-editable html element to an editable body.
-    if (node && node->hasTagName(htmlTag) && !node->rendererIsEditable() && node->document()->body() && node->document()->body()->rendererIsEditable())
-        return next.isNotNull() ? next : prev;
+    if (is<HTMLHtmlElement>(node) && !node->hasEditableStyle()) {
+        auto* body = node->document().bodyOrFrameset();
+        if (body && body->hasEditableStyle())
+            return next.isNotNull() ? next : prev;
+    }
 
     Node* editingRoot = editableRootForPosition(position);
         
@@ -590,15 +593,14 @@ UChar32 VisiblePosition::characterAfter() const
         return 0;
 
     UChar32 ch;
-    const UChar* characters = textNode->data().characters();
-    U16_NEXT(characters, offset, length, ch);
+    U16_NEXT(textNode->data(), offset, length, ch);
     return ch;
 }
 
 LayoutRect VisiblePosition::localCaretRect(RenderObject*& renderer) const
 {
     if (m_deepPosition.isNull()) {
-        renderer = 0;
+        renderer = nullptr;
         return IntRect();
     }
     Node* node = m_deepPosition.anchorNode();
@@ -612,19 +614,16 @@ LayoutRect VisiblePosition::localCaretRect(RenderObject*& renderer) const
     getInlineBoxAndOffset(inlineBox, caretOffset);
 
     if (inlineBox)
-        renderer = inlineBox->renderer();
+        renderer = &inlineBox->renderer();
 
     return renderer->localCaretRect(inlineBox, caretOffset);
 }
 
 IntRect VisiblePosition::absoluteCaretBounds() const
 {
-    RenderObject* renderer;
-    LayoutRect localRect = localCaretRect(renderer);
-    if (localRect.isEmpty() || !renderer)
-        return IntRect();
-
-    return renderer->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
+    RenderBlock* renderer = nullptr;
+    LayoutRect localRect = localCaretRectInRendererForCaretPainting(*this, renderer);
+    return absoluteBoundsForLocalCaretRect(renderer, localRect);
 }
 
 int VisiblePosition::lineDirectionPointForBlockDirectionNavigation() const
@@ -644,7 +643,7 @@ int VisiblePosition::lineDirectionPointForBlockDirectionNavigation() const
     return containingBlock->isHorizontalWritingMode() ? caretPoint.x() : caretPoint.y();
 }
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 void VisiblePosition::debugPosition(const char* msg) const
 {
@@ -671,12 +670,12 @@ void VisiblePosition::showTreeForThis() const
 PassRefPtr<Range> makeRange(const VisiblePosition &start, const VisiblePosition &end)
 {
     if (start.isNull() || end.isNull())
-        return 0;
+        return nullptr;
     
     Position s = start.deepEquivalent().parentAnchoredEquivalent();
     Position e = end.deepEquivalent().parentAnchoredEquivalent();
     if (s.isNull() || e.isNull())
-        return 0;
+        return nullptr;
 
     return Range::create(s.containerNode()->document(), s.containerNode(), s.offsetInContainerNode(), e.containerNode(), e.offsetInContainerNode());
 }
@@ -715,7 +714,7 @@ bool setEnd(Range *r, const VisiblePosition &visiblePosition)
 Element* enclosingBlockFlowElement(const VisiblePosition& visiblePosition)
 {
     if (visiblePosition.isNull())
-        return NULL;
+        return nullptr;
 
     return deprecatedEnclosingBlockFlowElement(visiblePosition.deepEquivalent().deprecatedNode());
 }
@@ -746,7 +745,7 @@ bool isLastVisiblePositionInNode(const VisiblePosition &visiblePosition, const N
 
 }  // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 void showTree(const WebCore::VisiblePosition* vpos)
 {

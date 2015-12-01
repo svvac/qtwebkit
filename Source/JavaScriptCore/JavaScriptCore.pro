@@ -11,11 +11,13 @@ LLIntOffsetsExtractor.file = LLIntOffsetsExtractor.pro
 LLIntOffsetsExtractor.makefile = Makefile.LLIntOffsetsExtractor
 SUBDIRS += LLIntOffsetsExtractor
 
+bytecode.file = Bytecode.pri
 derived_sources.file = DerivedSources.pri
 target.file = Target.pri
 
-SUBDIRS += derived_sources target
+SUBDIRS += bytecode derived_sources target
 
+addStrictSubdirOrderBetween(bytecode, LLIntOffsetsExtractor)
 addStrictSubdirOrderBetween(LLIntOffsetsExtractor, derived_sources)
 addStrictSubdirOrderBetween(derived_sources, target)
 

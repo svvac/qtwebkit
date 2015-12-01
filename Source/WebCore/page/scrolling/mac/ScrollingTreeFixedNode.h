@@ -26,7 +26,7 @@
 #ifndef ScrollingTreeFixedNode_h
 #define ScrollingTreeFixedNode_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
 
 #include "ScrollingConstraints.h"
 #include "ScrollingTreeNode.h"
@@ -40,15 +40,15 @@ class FixedPositionViewportConstraints;
 
 class ScrollingTreeFixedNode : public ScrollingTreeNode {
 public:
-    static PassOwnPtr<ScrollingTreeFixedNode> create(ScrollingTree*, ScrollingNodeID);
+    WEBCORE_EXPORT static Ref<ScrollingTreeFixedNode> create(ScrollingTree&, ScrollingNodeID);
 
     virtual ~ScrollingTreeFixedNode();
 
 private:
-    ScrollingTreeFixedNode(ScrollingTree*, ScrollingNodeID);
+    ScrollingTreeFixedNode(ScrollingTree&, ScrollingNodeID);
 
-    virtual void updateBeforeChildren(ScrollingStateNode*) OVERRIDE;
-    virtual void parentScrollPositionDidChange(const IntRect& viewportRect, const FloatSize& cumulativeDelta) OVERRIDE;
+    virtual void updateBeforeChildren(const ScrollingStateNode&) override;
+    virtual void updateLayersAfterAncestorChange(const ScrollingTreeNode& changedNode, const FloatRect& fixedPositionRect, const FloatSize& cumulativeDelta) override;
 
     FixedPositionViewportConstraints m_constraints;
     RetainPtr<CALayer> m_layer;
@@ -56,6 +56,8 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+SPECIALIZE_TYPE_TRAITS_SCROLLING_NODE(ScrollingTreeFixedNode, isFixedNode())
+
+#endif // ENABLE(ASYNC_SCROLLING)
 
 #endif // ScrollingTreeFixedNode_h

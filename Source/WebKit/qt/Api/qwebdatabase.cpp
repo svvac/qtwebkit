@@ -87,7 +87,7 @@ QString QWebDatabase::name() const
 QString QWebDatabase::displayName() const
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseDetails details = DatabaseManager::manager().detailsForNameAndOrigin(d->name, d->origin.get());
+    DatabaseDetails details = DatabaseManager::singleton().detailsForNameAndOrigin(d->name, d->origin.get());
     return details.displayName();
 #else
     return QString();
@@ -100,7 +100,7 @@ QString QWebDatabase::displayName() const
 qint64 QWebDatabase::expectedSize() const
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseDetails details = DatabaseManager::manager().detailsForNameAndOrigin(d->name, d->origin.get());
+    DatabaseDetails details = DatabaseManager::singleton().detailsForNameAndOrigin(d->name, d->origin.get());
     return details.expectedUsage();
 #else
     return 0;
@@ -113,7 +113,7 @@ qint64 QWebDatabase::expectedSize() const
 qint64 QWebDatabase::size() const
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseDetails details = DatabaseManager::manager().detailsForNameAndOrigin(d->name, d->origin.get());
+    DatabaseDetails details = DatabaseManager::singleton().detailsForNameAndOrigin(d->name, d->origin.get());
     return details.currentUsage();
 #else
     return 0;
@@ -148,7 +148,7 @@ QWebDatabase::QWebDatabase(QWebDatabasePrivate* priv)
 QString QWebDatabase::fileName() const
 {
 #if ENABLE(SQL_DATABASE)
-    return DatabaseManager::manager().fullPathForDatabase(d->origin.get(), d->name, false);
+    return DatabaseManager::singleton().fullPathForDatabase(d->origin.get(), d->name, false);
 #else
     return QString();
 #endif
@@ -171,7 +171,7 @@ QWebSecurityOrigin QWebDatabase::origin() const
 void QWebDatabase::removeDatabase(const QWebDatabase& db)
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseManager::manager().deleteDatabase(db.d->origin.get(), db.d->name);
+    DatabaseManager::singleton().deleteDatabase(db.d->origin.get(), db.d->name);
 #endif
 }
 
@@ -185,7 +185,7 @@ void QWebDatabase::removeDatabase(const QWebDatabase& db)
 void QWebDatabase::removeAllDatabases()
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseManager::manager().deleteAllDatabases();
+    DatabaseManager::singleton().deleteAllDatabases();
 #endif
 }
 

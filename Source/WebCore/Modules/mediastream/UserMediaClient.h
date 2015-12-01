@@ -33,25 +33,25 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "UserMediaRequest.h"
-#include <wtf/text/WTFString.h>
+#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
 class Page;
+class UserMediaRequest;
 
 class UserMediaClient {
 public:
     virtual void pageDestroyed() = 0;
 
-    virtual void requestUserMedia(PassRefPtr<UserMediaRequest>, const MediaStreamSourceVector& audioSources,  const MediaStreamSourceVector& videoSources) = 0;
-    virtual void cancelUserMediaRequest(UserMediaRequest*) = 0;
+    virtual void requestPermission(Ref<UserMediaRequest>&&) = 0;
+    virtual void cancelRequest(UserMediaRequest&) = 0;
 
 protected:
     virtual ~UserMediaClient() { }
 };
 
-void provideUserMediaTo(Page*, UserMediaClient*);
+WEBCORE_EXPORT void provideUserMediaTo(Page*, UserMediaClient*);
 
 } // namespace WebCore
 

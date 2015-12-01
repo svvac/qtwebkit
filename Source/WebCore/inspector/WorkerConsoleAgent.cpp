@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,32 +30,20 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
-
 #include "WorkerConsoleAgent.h"
+
+using namespace Inspector;
 
 namespace WebCore {
 
-WorkerConsoleAgent::WorkerConsoleAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager)
-    : InspectorConsoleAgent(instrumentingAgents, state, injectedScriptManager)
+WorkerConsoleAgent::WorkerConsoleAgent(WorkerAgentContext& context)
+    : WebConsoleAgent(context)
 {
 }
 
-WorkerConsoleAgent::~WorkerConsoleAgent()
+void WorkerConsoleAgent::addInspectedNode(ErrorString& error, int)
 {
-}
-
-void WorkerConsoleAgent::addInspectedNode(ErrorString* error, int)
-{
-    *error = "addInspectedNode is not supported for workers";
-}
-
-bool WorkerConsoleAgent::developerExtrasEnabled()
-{
-    return true;
+    error = ASCIILiteral("addInspectedNode is not supported for workers");
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR) && ENABLE(WORKERS)

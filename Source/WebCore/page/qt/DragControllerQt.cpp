@@ -42,25 +42,24 @@ const int DragController::DragIconBottomInset = 3;
 
 const float DragController::DragImageAlpha = 0.75f;
 
-
-bool DragController::isCopyKeyDown(DragData*)
+bool DragController::isCopyKeyDown(DragData&)
 {
     return false;
 }
-    
-DragOperation DragController::dragOperation(DragData* dragData)
+
+DragOperation DragController::dragOperation(DragData& dragData)
 {
     // FIXME: This logic is incomplete.
-    if (dragData->containsURL(0))
+    if (dragData.containsURL(DragData::DoNotConvertFilenames))
         return DragOperationCopy;
-        
+
     return DragOperationNone;
-} 
+}
 
 const IntSize& DragController::maxDragImageSize()
 {
     static const IntSize maxDragImageSize(400, 400);
-    
+
     return maxDragImageSize;
 }
 

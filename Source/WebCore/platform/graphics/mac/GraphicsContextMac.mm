@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,10 +28,20 @@
 
 #import "GraphicsContextCG.h"
 #import "GraphicsContextPlatformPrivateCG.h"
+#import "IntRect.h"
+#if USE(APPKIT)
 #import <AppKit/AppKit.h>
+#endif
 #import <wtf/StdLibExtras.h>
 
+#if PLATFORM(IOS)
+#import "Color.h"
+#import "WKGraphics.h"
+#endif
+
+#if !PLATFORM(IOS)
 #import "LocalCurrentGraphicsContext.h"
+#endif
 #import "WebCoreSystemInterface.h"
 
 @class NSColor;
@@ -45,45 +55,68 @@ namespace WebCore {
 // calls in this file are all exception-safe, so we don't block
 // exceptions for those.
 
-static void drawFocusRingToContext(CGContextRef context, CGPathRef focusRingPath, CGColorRef color, int radius)
+#if !PLATFORM(IOS)
+static void drawFocusRingToContext(CGContextRef context, CGPathRef focusRingPath)
 {
     CGContextBeginPath(context);
     CGContextAddPath(context, focusRingPath);
-    wkDrawFocusRing(context, color, radius);
+    wkDrawFocusRing(context, nullptr, 0);
 }
 
-void GraphicsContext::drawFocusRing(const Path& path, int width, int /*offset*/, const Color& color)
+static bool drawFocusRingToContextAtTime(CGContextRef context, CGPathRef focusRingPath, double timeOffset)
 {
-    // FIXME: Use 'offset' for something? http://webkit.org/b/49909
+    UNUSED_PARAM(timeOffset);
+    CGContextBeginPath(context);
+    CGContextAddPath(context, focusRingPath);
+    return wkDrawFocusRingAtTime(context, std::numeric_limits<double>::max());
+}
+#endif // !PLATFORM(IOS)
 
+void GraphicsContext::drawFocusRing(const Path& path, int /* width */, int /* offset */, const Color&)
+{
+#if PLATFORM(MAC)
     if (paintingDisabled() || path.isNull())
         return;
 
-    int radius = (width - 1) / 2;
-    CGColorRef colorRef = color.isValid() ? cachedCGColor(color, ColorSpaceDeviceRGB) : 0;
-
-    drawFocusRingToContext(platformContext(), path.platformPath(), colorRef, radius);
+    drawFocusRingToContext(platformContext(), path.platformPath());
+#else
+    UNUSED_PARAM(path);
+#endif
 }
 
-void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int offset, const Color& color)
+#if PLATFORM(MAC)
+void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int, int offset, double timeOffset, bool& needsRedraw)
 {
     if (paintingDisabled())
         return;
 
-    int radius = (width - 1) / 2;
-    offset += radius;
-    CGColorRef colorRef = color.isValid() ? cachedCGColor(color, ColorSpaceDeviceRGB) : 0;
+    RetainPtr<CGMutablePathRef> focusRingPath = adoptCF(CGPathCreateMutable());
+    for (auto& rect : rects)
+        CGPathAddRect(focusRingPath.get(), 0, CGRectInset(rect, -offset, -offset));
+
+    needsRedraw = drawFocusRingToContextAtTime(platformContext(), focusRingPath.get(), timeOffset);
+}
+#endif
+
+void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int, int offset, const Color&)
+{
+#if !PLATFORM(IOS)
+    if (paintingDisabled())
+        return;
 
     RetainPtr<CGMutablePathRef> focusRingPath = adoptCF(CGPathCreateMutable());
-    unsigned rectCount = rects.size();
-    for (unsigned i = 0; i < rectCount; i++)
-        CGPathAddRect(focusRingPath.get(), 0, CGRectInset(rects[i], -offset, -offset));
+    for (auto& rect : rects)
+        CGPathAddRect(focusRingPath.get(), 0, CGRectInset(rect, -offset, -offset));
 
-    drawFocusRingToContext(platformContext(), focusRingPath.get(), colorRef, radius);
+    drawFocusRingToContext(platformContext(), focusRingPath.get());
+#else
+    UNUSED_PARAM(rects);
+    UNUSED_PARAM(offset);
+#endif
 }
 
-
-static NSColor* createPatternColor(NSString* firstChoiceName, NSString* secondChoiceName, NSColor* defaultColor, bool& usingDot)
+#if !PLATFORM(IOS)
+static NSImage *findImage(NSString* firstChoiceName, NSString* secondChoiceName, bool& usingDot)
 {
     // Eventually we should be able to get rid of the secondChoiceName. For the time being we need both to keep
     // this working on all platforms.
@@ -91,12 +124,39 @@ static NSColor* createPatternColor(NSString* firstChoiceName, NSString* secondCh
     if (!image)
         image = [NSImage imageNamed:secondChoiceName];
     ASSERT(image); // if image is not available, we want to know
-    NSColor *color = (image ? [NSColor colorWithPatternImage:image] : nil);
-    if (color)
-        usingDot = true;
-    else
-        color = defaultColor;
-    return color;
+    usingDot = image;
+    return image;
+}
+#else
+static RetainPtr<CGPatternRef> createDotPattern(bool& usingDot, const char* resourceName)
+{
+    RetainPtr<CGImageRef> image = adoptCF(WKGraphicsCreateImageFromBundleWithName(resourceName));
+    ASSERT(image); // if image is not available, we want to know
+    usingDot = true;
+    return adoptCF(WKCreatePatternFromCGImage(image.get()));
+}
+#endif // !PLATFORM(IOS)
+
+static NSImage *spellingImage = nullptr;
+static NSImage *grammarImage = nullptr;
+static NSImage *correctionImage = nullptr;
+
+void GraphicsContext::updateDocumentMarkerResources()
+{
+    [spellingImage release];
+    spellingImage = nullptr;
+    [grammarImage release];
+    grammarImage = nullptr;
+    [correctionImage release];
+    correctionImage = nullptr;
+}
+
+static inline void setPatternPhaseInUserSpace(CGContextRef context, CGPoint phasePoint)
+{
+    CGAffineTransform userToBase = getUserToBaseCTM(context);
+    CGPoint phase = CGPointApplyAffineTransform(phasePoint, userToBase);
+
+    CGContextSetPatternPhase(context, CGSizeMake(phase.x, phase.y));
 }
 
 // WebKit on Mac is a standard platform component, so it must use the standard platform artwork for underline.
@@ -110,75 +170,129 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& point, float w
     float patternWidth = cMisspellingLinePatternWidth;
 
     bool usingDot;
-    NSColor *patternColor;
+#if !PLATFORM(IOS)
+    NSImage *image;
+    NSColor *fallbackColor;
+#else
+    CGPatternRef dotPattern;
+#endif
     switch (style) {
         case DocumentMarkerSpellingLineStyle:
         {
             // Constants for spelling pattern color.
             static bool usingDotForSpelling = false;
-            DEFINE_STATIC_LOCAL(RetainPtr<NSColor>, spellingPatternColor, (createPatternColor(@"NSSpellingDot", @"SpellingDot", [NSColor redColor], usingDotForSpelling)));
+#if !PLATFORM(IOS)
+            if (!spellingImage)
+                spellingImage = [findImage(@"NSSpellingDot", @"SpellingDot", usingDotForSpelling) retain];
+            image = spellingImage;
+            fallbackColor = [NSColor redColor];
+#else
+            static CGPatternRef spellingPattern = createDotPattern(usingDotForSpelling, "SpellingDot").leakRef();
+            dotPattern = spellingPattern;
+#endif
             usingDot = usingDotForSpelling;
-            patternColor = spellingPatternColor.get();
             break;
         }
         case DocumentMarkerGrammarLineStyle:
         {
+#if !PLATFORM(IOS)
             // Constants for grammar pattern color.
             static bool usingDotForGrammar = false;
-            DEFINE_STATIC_LOCAL(RetainPtr<NSColor>, grammarPatternColor, (createPatternColor(@"NSGrammarDot", @"GrammarDot", [NSColor greenColor], usingDotForGrammar)));
-            usingDot = usingDotForGrammar;
-            patternColor = grammarPatternColor.get();
+            if (!grammarImage)
+                grammarImage = [findImage(@"NSGrammarDot", @"GrammarDot", usingDotForGrammar) retain];
+            usingDot = grammarImage;
+            image = grammarImage;
+            fallbackColor = [NSColor greenColor];
             break;
+#else
+            ASSERT_NOT_REACHED();
+            return;
+#endif
         }
-#if PLATFORM(MAC) && (PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070)
+#if PLATFORM(MAC)
         // To support correction panel.
         case DocumentMarkerAutocorrectionReplacementLineStyle:
         case DocumentMarkerDictationAlternativesLineStyle:
         {
             // Constants for spelling pattern color.
             static bool usingDotForSpelling = false;
-            DEFINE_STATIC_LOCAL(RetainPtr<NSColor>, spellingPatternColor, (createPatternColor(@"NSCorrectionDot", @"CorrectionDot", [NSColor blueColor], usingDotForSpelling)));
+            if (!correctionImage)
+                correctionImage = [findImage(@"NSCorrectionDot", @"CorrectionDot", usingDotForSpelling) retain];
             usingDot = usingDotForSpelling;
-            patternColor = spellingPatternColor.get();
+            image = correctionImage;
+            fallbackColor = [NSColor blueColor];
             break;
         }
 #endif
+#if PLATFORM(IOS)
+        case TextCheckingDictationPhraseWithAlternativesLineStyle:
+        {
+            static bool usingDotForDictationPhraseWithAlternatives = false;
+            static CGPatternRef dictationPhraseWithAlternativesPattern = createDotPattern(usingDotForDictationPhraseWithAlternatives, "DictationPhraseWithAlternativesDot").leakRef();
+            dotPattern = dictationPhraseWithAlternativesPattern;
+            usingDot = usingDotForDictationPhraseWithAlternatives;
+            break;
+        }
+#endif // PLATFORM(IOS)
         default:
+#if PLATFORM(IOS)
+            // FIXME: Should remove default case so we get compile-time errors.
+            ASSERT_NOT_REACHED();
+#endif // PLATFORM(IOS)
             return;
     }
+    
+    FloatPoint offsetPoint = point;
 
     // Make sure to draw only complete dots.
-    // NOTE: Code here used to shift the underline to the left and increase the width
-    // to make sure everything gets underlined, but that results in drawing out of
-    // bounds (e.g. when at the edge of a view) and could make it appear that the
-    // space between adjacent misspelled words was underlined.
     if (usingDot) {
         // allow slightly more considering that the pattern ends with a transparent pixel
         float widthMod = fmodf(width, patternWidth);
-        if (patternWidth - widthMod > cMisspellingLinePatternGapWidth)
+        if (patternWidth - widthMod > cMisspellingLinePatternGapWidth) {
+            float gapIncludeWidth = 0;
+            if (width > patternWidth)
+                gapIncludeWidth = cMisspellingLinePatternGapWidth;
+            offsetPoint.move(floor((widthMod + gapIncludeWidth) / 2), 0);
             width -= widthMod;
+        }
     }
     
     // FIXME: This code should not use NSGraphicsContext currentContext
     // In order to remove this requirement we will need to use CGPattern instead of NSColor
-    // FIXME: This code should not be using wkSetPatternPhaseInUserSpace, as this approach is wrong
+    // FIXME: This code should not be using setPatternPhaseInUserSpace, as this approach is wrong
     // for transforms.
 
     // Draw underline.
-    LocalCurrentGraphicsContext localContext(this);
-    NSGraphicsContext *currentContext = [NSGraphicsContext currentContext];
-    CGContextRef context = (CGContextRef)[currentContext graphicsPort];
+    CGContextRef context = platformContext();
     CGContextSaveGState(context);
 
-    [patternColor set];
+#if PLATFORM(IOS)
+    WKSetPattern(context, dotPattern, YES, YES);
+#endif
 
-    wkSetPatternPhaseInUserSpace(context, point);
+    setPatternPhaseInUserSpace(context, offsetPoint);
 
-    NSRectFillUsingOperation(NSMakeRect(point.x(), point.y(), width, patternHeight), NSCompositeSourceOver);
+    CGRect destinationRect = CGRectMake(offsetPoint.x(), offsetPoint.y(), width, patternHeight);
+#if !PLATFORM(IOS)
+    if (image) {
+        // FIXME: Rather than getting the NSImage and then picking the CGImage from it, we should do what iOS does and
+        // just load the CGImage in the first place.
+        NSRect dotRect = NSMakeRect(offsetPoint.x(), offsetPoint.y(), patternWidth, patternHeight);
+        CGImageRef cgImage = [image CGImageForProposedRect:&dotRect context:[NSGraphicsContext graphicsContextWithGraphicsPort:context flipped:YES] hints:nullptr];
+        CGContextClipToRect(context, destinationRect);
+        CGContextDrawTiledImage(context, NSRectToCGRect(dotRect), cgImage);
+    } else {
+        CGContextSetFillColorWithColor(context, [fallbackColor CGColor]);
+        CGContextFillRect(context, destinationRect);
+    }
+#else
+    WKRectFillUsingOperation(context, destinationRect, kCGCompositeSover);
+#endif
     
     CGContextRestoreGState(context);
 }
 
+#if !PLATFORM(IOS)
 CGColorSpaceRef linearRGBColorSpaceRef()
 {
     static CGColorSpaceRef linearSRGBSpace = 0;
@@ -198,5 +312,6 @@ CGColorSpaceRef linearRGBColorSpaceRef()
 
     return linearSRGBSpace;
 }
+#endif
 
 }

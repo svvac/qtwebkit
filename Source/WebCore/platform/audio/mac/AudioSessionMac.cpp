@@ -32,7 +32,6 @@
 #include "Logging.h"
 #include "NotImplemented.h"
 #include <CoreAudio/AudioHardware.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -56,7 +55,7 @@ public:
 };
 
 AudioSession::AudioSession()
-    : m_private(adoptPtr(new AudioSessionPrivate()))
+    : m_private(std::make_unique<AudioSessionPrivate>())
 {
 }
 
@@ -108,9 +107,10 @@ size_t AudioSession::numberOfOutputChannels() const
     return 0;
 }
 
-void AudioSession::setActive(bool)
+bool AudioSession::tryToSetActive(bool)
 {
     notImplemented();
+    return true;
 }
 
 size_t AudioSession::preferredBufferSize() const

@@ -26,13 +26,12 @@
 #import "config.h"
 #import "WebCoreAVFResourceLoader.h"
 
-#if ENABLE(VIDEO) && USE(AVFOUNDATION) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if ENABLE(VIDEO) && USE(AVFOUNDATION) && HAVE(AVFOUNDATION_LOADER_DELEGATE)
 
 #import "CachedRawResource.h"
 #import "CachedResourceLoader.h"
 #import "CachedResourceRequest.h"
 #import "MediaPlayerPrivateAVFoundationObjC.h"
-#import "ResourceBuffer.h"
 #import "ResourceLoaderOptions.h"
 #import "SharedBuffer.h"
 #import "SoftLinking.h"
@@ -43,14 +42,14 @@
 
 namespace WebCore {
 
-PassOwnPtr<WebCoreAVFResourceLoader> WebCoreAVFResourceLoader::create(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest* avRequest)
+PassRefPtr<WebCoreAVFResourceLoader> WebCoreAVFResourceLoader::create(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest *avRequest)
 {
     ASSERT(avRequest);
     ASSERT(parent);
-    return adoptPtr(new WebCoreAVFResourceLoader(parent, avRequest));
+    return adoptRef(new WebCoreAVFResourceLoader(parent, avRequest));
 }
 
-WebCoreAVFResourceLoader::WebCoreAVFResourceLoader(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest* avRequest)
+WebCoreAVFResourceLoader::WebCoreAVFResourceLoader(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest *avRequest)
     : m_parent(parent)
     , m_avRequest(avRequest)
 {
@@ -63,14 +62,15 @@ WebCoreAVFResourceLoader::~WebCoreAVFResourceLoader()
 
 void WebCoreAVFResourceLoader::startLoading()
 {
-    if (m_resource)
+    if (m_resource || !m_parent)
         return;
 
-    KURL requestURL = [[m_avRequest.get() request] URL];
+    URL requestURL = [[m_avRequest.get() request] URL];
 
-    CachedResourceRequest request(ResourceRequest(requestURL), ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, BufferData, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType));
+    // ContentSecurityPolicyImposition::DoPolicyCheck is a placeholder value. It does not affect the request since Content Security Policy does not apply to raw resources.
+    CachedResourceRequest request(ResourceRequest(requestURL), ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, BufferData, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading));
 
-    request.mutableResourceRequest().setPriority(ResourceLoadPriorityLow);
+    request.mutableResourceRequest().setPriority(ResourceLoadPriority::Low);
     CachedResourceLoader* loader = m_parent->player()->cachedResourceLoader();
     m_resource = loader ? loader->requestRawResource(request) : 0;
     if (m_resource)
@@ -88,6 +88,15 @@ void WebCoreAVFResourceLoader::stopLoading()
 
     m_resource->removeClient(this);
     m_resource = 0;
+
+    if (m_parent && m_avRequest)
+        m_parent->didStopLoadingRequest(m_avRequest.get());
+}
+
+void WebCoreAVFResourceLoader::invalidate()
+{
+    m_parent = nullptr;
+    stopLoading();
 }
 
 void WebCoreAVFResourceLoader::responseReceived(CachedResource* resource, const ResourceResponse& response)
@@ -143,7 +152,7 @@ void WebCoreAVFResourceLoader::fulfillRequestWithResource(CachedResource* resour
     if (!dataRequest)
         return;
 
-    SharedBuffer* data = resource->resourceBuffer() ? resource->resourceBuffer()->sharedBuffer() : 0;
+    SharedBuffer* data = resource->resourceBuffer();
     if (!data)
         return;
 

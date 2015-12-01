@@ -36,12 +36,12 @@
 #include "GraphicsContext.h"
 #include "ImageBuffer.h"
 #include "NativeImageQt.h"
+#include "NotImplemented.h"
 #include "StrokeStyleApplier.h"
 #include <QPainterPath>
 #include <QString>
 #include <QTransform>
 #include <wtf/MathExtras.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -329,6 +329,11 @@ void Path::addRect(const FloatRect& r)
     m_path.addRect(r.x(), r.y(), r.width(), r.height());
 }
 
+void Path::addEllipse(FloatPoint point, float radiusX, float radiusY, float rotation, float startAngle, float endAngle, bool anticlockwise)
+{
+    notImplemented();
+}
+
 void Path::addEllipse(const FloatRect& r)
 {
     m_path.addEllipse(r.x(), r.y(), r.width(), r.height());
@@ -358,7 +363,7 @@ FloatPoint Path::currentPoint() const
     return m_path.currentPosition();
 }
 
-void Path::apply(void* info, PathApplierFunction function) const
+void Path::apply(const PathApplierFunction& function) const
 {
     PathElement pelement;
     FloatPoint points[3];
@@ -370,12 +375,12 @@ void Path::apply(void* info, PathApplierFunction function) const
             case QPainterPath::MoveToElement:
                 pelement.type = PathElementMoveToPoint;
                 pelement.points[0] = QPointF(cur);
-                function(info, &pelement);
+                function(pelement);
                 break;
             case QPainterPath::LineToElement:
                 pelement.type = PathElementAddLineToPoint;
                 pelement.points[0] = QPointF(cur);
-                function(info, &pelement);
+                function(pelement);
                 break;
             case QPainterPath::CurveToElement:
             {
@@ -389,7 +394,7 @@ void Path::apply(void* info, PathApplierFunction function) const
                 pelement.points[0] = QPointF(cur);
                 pelement.points[1] = QPointF(c1);
                 pelement.points[2] = QPointF(c2);
-                function(info, &pelement);
+                function(pelement);
 
                 i += 2;
                 break;
@@ -437,6 +442,11 @@ float Path::normalAngleAtLength(float length, bool& ok) const
     if (angle > 0)
         angle = 360 - angle;
     return angle;
+}
+
+void Path::addPath(const Path &, const AffineTransform &)
+{
+    notImplemented();
 }
 
 }

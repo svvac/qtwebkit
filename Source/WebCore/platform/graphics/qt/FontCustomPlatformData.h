@@ -22,33 +22,31 @@
 #ifndef FontCustomPlatformData_h
 #define FontCustomPlatformData_h
 
-#include "FontOrientation.h"
-#include "FontRenderingMode.h"
-#include "FontWidthVariant.h"
+#include "TextFlags.h"
 #include <QRawFont>
-#include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
+class FontDescription;
 class FontPlatformData;
 class SharedBuffer;
 
 struct FontCustomPlatformData {
-    WTF_MAKE_NONCOPYABLE(FontCustomPlatformData); WTF_MAKE_FAST_ALLOCATED;
+    WTF_MAKE_NONCOPYABLE(FontCustomPlatformData);
 public:
     FontCustomPlatformData() { }
 
-    FontPlatformData fontPlatformData(int size, bool bold, bool italic, FontOrientation = Horizontal,
-                                      FontWidthVariant = RegularWidth, FontRenderingMode = NormalRenderingMode);
-
+    FontPlatformData fontPlatformData(const FontDescription& fontDescription, bool bold, bool italic, FontOrientation = Horizontal,
+                                      FontWidthVariant = RegularWidth);
+    
     static bool supportsFormat(const String&);
 
     QRawFont m_rawFont;
 };
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer);
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer* buffer);
 
 } // namespace WebCore
 

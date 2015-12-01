@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2008, 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,16 +26,19 @@
 #import "config.h"
 #import "objc_instance.h"
 
-#import "runtime_method.h"
-#import <runtime/ObjectPrototype.h>
 #import "JSDOMBinding.h"
+#import "NSPointerFunctionsSPI.h"
 #import "ObjCRuntimeObject.h"
 #import "WebScriptObject.h"
+#import "WebScriptObjectProtocol.h"
+#import "runtime/FunctionPrototype.h"
+#import "runtime_method.h"
 #import <objc/objc-auto.h>
 #import <runtime/Error.h>
 #import <runtime/JSLock.h>
-#import "runtime/FunctionPrototype.h"
+#import <runtime/ObjectPrototype.h>
 #import <wtf/Assertions.h>
+#import <wtf/spi/cocoa/NSMapTableSPI.h>
 
 #ifdef NDEBUG
 #define OBJC_LOG(formatAndArgs...) ((void)0)
@@ -53,10 +56,8 @@ static NSString *s_exception;
 static JSGlobalObject* s_exceptionEnvironment; // No need to protect this value, since we just use it for a pointer comparison.
 static NSMapTable *s_instanceWrapperCache;
 
-#if COMPILER(CLANG)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif    
 
 static NSMapTable *createInstanceWrapperCache()
 {
@@ -66,13 +67,12 @@ static NSMapTable *createInstanceWrapperCache()
     return [[NSMapTable alloc] initWithKeyOptions:keyOptions valueOptions:valueOptions capacity:0];
 }
 
-#if COMPILER(CLANG)
 #pragma clang diagnostic pop
-#endif
 
 RuntimeObject* ObjcInstance::newRuntimeObject(ExecState* exec)
 {
-    return ObjCRuntimeObject::create(exec, exec->lexicalGlobalObject(), this);
+    // FIXME: deprecatedGetDOMStructure uses the prototype off of the wrong global object.
+    return ObjCRuntimeObject::create(exec->vm(), WebCore::deprecatedGetDOMStructure<ObjCRuntimeObject>(exec), this);
 }
 
 void ObjcInstance::setGlobalException(NSString* exception, JSGlobalObject* exceptionEnvironment)
@@ -91,7 +91,7 @@ void ObjcInstance::moveGlobalExceptionToExecState(ExecState* exec)
         return;
     }
 
-    if (!s_exceptionEnvironment || s_exceptionEnvironment == exec->dynamicGlobalObject()) {
+    if (!s_exceptionEnvironment || s_exceptionEnvironment == exec->vmEntryGlobalObject()) {
         JSLockHolder lock(exec);
         throwError(exec, s_exception);
     }
@@ -101,8 +101,8 @@ void ObjcInstance::moveGlobalExceptionToExecState(ExecState* exec)
     s_exceptionEnvironment = 0;
 }
 
-ObjcInstance::ObjcInstance(id instance, PassRefPtr<RootObject> rootObject) 
-    : Instance(rootObject)
+ObjcInstance::ObjcInstance(id instance, RefPtr<RootObject>&& rootObject) 
+    : Instance(WTF::move(rootObject))
     , _instance(instance)
     , _class(0)
     , _pool(0)
@@ -110,15 +110,15 @@ ObjcInstance::ObjcInstance(id instance, PassRefPtr<RootObject> rootObject)
 {
 }
 
-PassRefPtr<ObjcInstance> ObjcInstance::create(id instance, PassRefPtr<RootObject> rootObject)
+RefPtr<ObjcInstance> ObjcInstance::create(id instance, RefPtr<RootObject>&& rootObject)
 {
     if (!s_instanceWrapperCache)
         s_instanceWrapperCache = createInstanceWrapperCache();
     if (void* existingWrapper = NSMapGet(s_instanceWrapperCache, instance))
         return static_cast<ObjcInstance*>(existingWrapper);
-    RefPtr<ObjcInstance> wrapper = adoptRef(new ObjcInstance(instance, rootObject));
+    RefPtr<ObjcInstance> wrapper = adoptRef(new ObjcInstance(instance, WTF::move(rootObject)));
     NSMapInsert(s_instanceWrapperCache, instance, wrapper.get());
-    return wrapper.release();
+    return wrapper;
 }
 
 ObjcInstance::~ObjcInstance() 
@@ -191,12 +191,12 @@ public:
         return runtimeMethod;
     }
 
-    static Structure* createStructure(VM& vm, JSC::JSGlobalObject* globalObject, JSValue prototype)
+    static Structure* createStructure(VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
         return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
     }
 
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
 private:
     typedef RuntimeMethod Base;
@@ -209,22 +209,22 @@ private:
     void finishCreation(VM& vm, const String& name)
     {
         Base::finishCreation(vm, name);
-        ASSERT(inherits(&s_info));
+        ASSERT(inherits(info()));
     }
 };
 
-const ClassInfo ObjCRuntimeMethod::s_info = { "ObjCRuntimeMethod", &RuntimeMethod::s_info, 0, 0, CREATE_METHOD_TABLE(ObjCRuntimeMethod) };
+const ClassInfo ObjCRuntimeMethod::s_info = { "ObjCRuntimeMethod", &RuntimeMethod::s_info, 0, CREATE_METHOD_TABLE(ObjCRuntimeMethod) };
 
-JSValue ObjcInstance::getMethod(ExecState* exec, PropertyName propertyName)
+JSC::JSValue ObjcInstance::getMethod(ExecState* exec, PropertyName propertyName)
 {
     Method* method = getClass()->methodNamed(propertyName, this);
     return ObjCRuntimeMethod::create(exec, exec->lexicalGlobalObject(), propertyName.publicName(), method);
 }
 
-JSValue ObjcInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
+JSC::JSValue ObjcInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod)
 {
-    if (!asObject(runtimeMethod)->inherits(&ObjCRuntimeMethod::s_info))
-        return throwError(exec, createTypeError(exec, "Attempt to invoke non-plug-in method on plug-in object."));
+    if (!asObject(runtimeMethod)->inherits(ObjCRuntimeMethod::info()))
+        return exec->vm().throwException(exec, createTypeError(exec, "Attempt to invoke non-plug-in method on plug-in object."));
 
     ObjcMethod *method = static_cast<ObjcMethod*>(runtimeMethod->method());
     ASSERT(method);
@@ -232,7 +232,7 @@ JSValue ObjcInstance::invokeMethod(ExecState* exec, RuntimeMethod* runtimeMethod
     return invokeObjcMethod(exec, method);
 }
 
-JSValue ObjcInstance::invokeObjcMethod(ExecState* exec, ObjcMethod* method)
+JSC::JSValue ObjcInstance::invokeObjcMethod(ExecState* exec, ObjcMethod* method)
 {
     JSValue result = jsUndefined();
     
@@ -260,13 +260,13 @@ JSValue ObjcInstance::invokeObjcMethod(ExecState* exec, ObjcMethod* method)
         NSMutableArray* objcArgs = [NSMutableArray array];
         int count = exec->argumentCount();
         for (int i = 0; i < count; i++) {
-            ObjcValue value = convertValueToObjcValue(exec, exec->argument(i), ObjcObjectType);
+            ObjcValue value = convertValueToObjcValue(exec, exec->uncheckedArgument(i), ObjcObjectType);
             [objcArgs addObject:value.objectValue];
         }
         [invocation setArgument:&objcArgs atIndex:3];
     } else {
         unsigned count = [signature numberOfArguments];
-        for (unsigned i = 2; i < count ; i++) {
+        for (unsigned i = 2; i < count; ++i) {
             const char* type = [signature getArgumentTypeAtIndex:i];
             ObjcValueType objcValueType = objcValueTypeForType(type);
 
@@ -275,7 +275,7 @@ JSValue ObjcInstance::invokeObjcMethod(ExecState* exec, ObjcMethod* method)
             // types.
             ASSERT(objcValueType != ObjcInvalidType && objcValueType != ObjcVoidType);
 
-            ObjcValue value = convertValueToObjcValue(exec, exec->argument(i-2), objcValueType);
+            ObjcValue value = convertValueToObjcValue(exec, exec->argument(i - 2), objcValueType);
 
             switch (objcValueType) {
                 case ObjcObjectType:
@@ -350,7 +350,7 @@ JSValue ObjcInstance::invokeObjcMethod(ExecState* exec, ObjcMethod* method)
     return const_cast<JSValue&>(result);
 }
 
-JSValue ObjcInstance::invokeDefaultMethod(ExecState* exec)
+JSC::JSValue ObjcInstance::invokeDefaultMethod(ExecState* exec)
 {
     JSValue result = jsUndefined();
 
@@ -374,7 +374,7 @@ JSValue ObjcInstance::invokeDefaultMethod(ExecState* exec)
     NSMutableArray* objcArgs = [NSMutableArray array];
     unsigned count = exec->argumentCount();
     for (unsigned i = 0; i < count; i++) {
-        ObjcValue value = convertValueToObjcValue(exec, exec->argument(i), ObjcObjectType);
+        ObjcValue value = convertValueToObjcValue(exec, exec->uncheckedArgument(i), ObjcObjectType);
         [objcArgs addObject:value.objectValue];
     }
     [invocation setArgument:&objcArgs atIndex:2];
@@ -433,7 +433,7 @@ bool ObjcInstance::setValueOfUndefinedField(ExecState* exec, PropertyName proper
     return true;
 }
 
-JSValue ObjcInstance::getValueOfUndefinedField(ExecState* exec, PropertyName propertyName) const
+JSC::JSValue ObjcInstance::getValueOfUndefinedField(ExecState* exec, PropertyName propertyName) const
 {
     String name(propertyName.publicName());
     if (name.isNull())
@@ -466,7 +466,7 @@ JSValue ObjcInstance::getValueOfUndefinedField(ExecState* exec, PropertyName pro
     return const_cast<JSValue&>(result);
 }
 
-JSValue ObjcInstance::defaultValue(ExecState* exec, PreferredPrimitiveType hint) const
+JSC::JSValue ObjcInstance::defaultValue(ExecState* exec, PreferredPrimitiveType hint) const
 {
     if (hint == PreferString)
         return stringValue(exec);
@@ -479,24 +479,24 @@ JSValue ObjcInstance::defaultValue(ExecState* exec, PreferredPrimitiveType hint)
     return valueOf(exec);
 }
 
-JSValue ObjcInstance::stringValue(ExecState* exec) const
+JSC::JSValue ObjcInstance::stringValue(ExecState* exec) const
 {
     return convertNSStringToString(exec, [getObject() description]);
 }
 
-JSValue ObjcInstance::numberValue(ExecState*) const
+JSC::JSValue ObjcInstance::numberValue(ExecState*) const
 {
     // FIXME:  Implement something sensible
     return jsNumber(0);
 }
 
-JSValue ObjcInstance::booleanValue() const
+JSC::JSValue ObjcInstance::booleanValue() const
 {
     // FIXME:  Implement something sensible
     return jsBoolean(false);
 }
 
-JSValue ObjcInstance::valueOf(ExecState* exec) const 
+JSC::JSValue ObjcInstance::valueOf(ExecState* exec) const 
 {
     return stringValue(exec);
 }

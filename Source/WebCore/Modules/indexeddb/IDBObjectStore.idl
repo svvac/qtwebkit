@@ -25,8 +25,8 @@
 
 [
     Conditional=INDEXED_DATABASE,
-    JSNoStaticTables,
-    ImplementationLacksVTable
+    EnabledAtRuntime=IndexedDB,
+    SkipVTableValidation,
 ] interface IDBObjectStore {
     [TreatReturnedNullStringAs=Null] readonly attribute DOMString name;
     [ImplementedAs=keyPathAny] readonly attribute IDBAny keyPath;
@@ -34,16 +34,15 @@
     readonly attribute IDBTransaction transaction;
     readonly attribute boolean autoIncrement;
 
-    [CallWith=ScriptState, RaisesException] IDBRequest put(any value, optional any key);
-    [CallWith=ScriptState, RaisesException] IDBRequest add(any value, optional any key);
+    [CallWith=ScriptExecutionContext, Custom, ImplementedAs=putFunction, RaisesException] IDBRequest put(any value, optional any key);
+    [CallWith=ScriptExecutionContext, Custom, RaisesException] IDBRequest add(any value, optional any key);
     [CallWith=ScriptExecutionContext, ImplementedAs=deleteFunction, RaisesException] IDBRequest delete(IDBKeyRange? keyRange);
     [CallWith=ScriptExecutionContext, ImplementedAs=deleteFunction, RaisesException] IDBRequest delete(any key);
-    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest clear();
     [CallWith=ScriptExecutionContext, RaisesException] IDBRequest get(IDBKeyRange? key);
     [CallWith=ScriptExecutionContext, RaisesException] IDBRequest get(any key);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest clear();
     [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openCursor(optional IDBKeyRange? range, optional DOMString direction);
     [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openCursor(any key, optional DOMString direction);
-
     [CallWith=ScriptExecutionContext, Custom, RaisesException] IDBIndex createIndex(DOMString name, sequence<DOMString> keyPath, optional Dictionary options);
     [CallWith=ScriptExecutionContext, Custom, RaisesException] IDBIndex createIndex(DOMString name, DOMString keyPath, optional Dictionary options);
     [RaisesException] IDBIndex index(DOMString name);

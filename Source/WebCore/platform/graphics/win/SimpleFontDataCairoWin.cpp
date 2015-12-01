@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -27,11 +27,10 @@
  */
 
 #include "config.h"
-#include "SimpleFontData.h"
+#include "Font.h"
 
 #include <windows.h>
 
-#include "Font.h"
 #include "FontCache.h"
 #include "FontDescription.h"
 #include "HWndDC.h"
@@ -42,7 +41,7 @@
 
 namespace WebCore {
 
-void SimpleFontData::platformInit()
+void Font::platformInit()
 {
     m_syntheticBoldOffset = m_platformData.syntheticBold() ? 1.0f : 0.f;
     m_scriptCache = 0;
@@ -70,20 +69,29 @@ void SimpleFontData::platformInit()
 
     cairo_win32_scaled_font_select_font(scaledFont, dc);
 
-    TEXTMETRIC textMetrics;
-    GetTextMetrics(dc, &textMetrics);
-    float ascent = textMetrics.tmAscent * metricsMultiplier;
-    float descent = textMetrics.tmDescent * metricsMultiplier;
+    OUTLINETEXTMETRIC metrics;
+    GetOutlineTextMetrics(dc, sizeof(metrics), &metrics);
+    TEXTMETRIC& textMetrics = metrics.otmTextMetrics;
+    float ascent, descent, lineGap;
+    // The Open Font Format describes the OS/2 USE_TYPO_METRICS flag as follows:
+    // "If set, it is strongly recommended to use OS/2.sTypoAscender - OS/2.sTypoDescender+ OS/2.sTypoLineGap as a value for default line spacing for this font."
+    const UINT useTypoMetricsMask = 1 << 7;
+    if (metrics.otmfsSelection & useTypoMetricsMask) {
+        ascent = metrics.otmAscent * metricsMultiplier;
+        descent = metrics.otmDescent * metricsMultiplier;
+        lineGap = metrics.otmLineGap * metricsMultiplier;
+    } else {
+        ascent = textMetrics.tmAscent * metricsMultiplier;
+        descent = textMetrics.tmDescent * metricsMultiplier;
+        lineGap = textMetrics.tmExternalLeading * metricsMultiplier;
+    }
     float xHeight = ascent * 0.56f; // Best guess for xHeight for non-Truetype fonts.
-    float lineGap = textMetrics.tmExternalLeading * metricsMultiplier;
 
     int faceLength = ::GetTextFace(dc, 0, 0);
     Vector<WCHAR> faceName(faceLength);
     ::GetTextFace(dc, faceLength, faceName.data());
     m_isSystemFont = !wcscmp(faceName.data(), L"Lucida Grande");
  
-    ascent = ascentConsideringMacAscentHack(faceName.data(), ascent, descent);
-
     m_fontMetrics.setAscent(ascent);
     m_fontMetrics.setDescent(descent);
     m_fontMetrics.setLineGap(lineGap);
@@ -104,7 +112,7 @@ void SimpleFontData::platformInit()
     RestoreDC(dc, -1);
 }
 
-FloatRect SimpleFontData::platformBoundsForGlyph(Glyph glyph) const
+FloatRect Font::platformBoundsForGlyph(Glyph glyph) const
 {
     if (m_platformData.useGDI())
         return boundsForGDIGlyph(glyph);
@@ -112,7 +120,7 @@ FloatRect SimpleFontData::platformBoundsForGlyph(Glyph glyph) const
     return FloatRect();
 }
     
-float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
+float Font::platformWidthForGlyph(Glyph glyph) const
 {
     if (m_platformData.useGDI())
        return widthForGDIGlyph(glyph);

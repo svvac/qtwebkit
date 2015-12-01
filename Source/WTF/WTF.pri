@@ -26,7 +26,6 @@ mac {
         }
     }
     else:!contains(QT_CONFIG,no-pkg-config):packagesExist("icu-i18n"): PKGCONFIG *= icu-i18n
-    else:android: LIBS += -licui18n -licuuc
     else: LIBS += -licui18n -licuuc -licudata
 }
 
@@ -39,14 +38,6 @@ win32-* {
     LIBS += -lgdi32
 }
 
-qnx {
-    # required for timegm
-    LIBS += -lnbutil
-}
-
 mac {
     LIBS += -framework AppKit
 }
-
-# MSVC is lacking stdint.h as well as inttypes.h.
-win32-msvc*|win32-icc|wince*: INCLUDEPATH += $$ROOT_WEBKIT_DIR/Source/JavaScriptCore/os-win32

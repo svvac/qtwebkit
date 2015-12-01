@@ -66,7 +66,7 @@ class QWebSettings;
 class QWebFullScreenVideoHandler;
 class UndoStepQt;
 
-class WEBKIT_EXPORTDATA QWebPageAdapter {
+class QWebPageAdapter {
 public:
 
 #define FOR_EACH_MAPPED_MENU_ACTION(F, SEPARATOR) \
@@ -78,7 +78,6 @@ public:
     F(OpenImageInNewWindow, WebCore::ContextMenuItemTagOpenImageInNewWindow) SEPARATOR \
     F(DownloadImageToDisk, WebCore::ContextMenuItemTagDownloadImageToDisk) SEPARATOR \
     F(CopyImageToClipboard, WebCore::ContextMenuItemTagCopyImageToClipboard) SEPARATOR \
-    F(CopyImageUrlToClipboard, WebCore::ContextMenuItemTagCopyImageUrlToClipboard) SEPARATOR \
     F(OpenFrameInNewWindow, WebCore::ContextMenuItemTagOpenFrameInNewWindow) SEPARATOR \
     F(Copy, WebCore::ContextMenuItemTagCopy) SEPARATOR \
     F(Back, WebCore::ContextMenuItemTagGoBack) SEPARATOR \
@@ -93,7 +92,6 @@ public:
     F(ToggleBold, WebCore::ContextMenuItemTagBold) SEPARATOR \
     F(ToggleItalic, WebCore::ContextMenuItemTagItalic) SEPARATOR \
     F(ToggleUnderline, WebCore::ContextMenuItemTagUnderline) SEPARATOR \
-    F(SelectAll, WebCore::ContextMenuItemTagSelectAll) SEPARATOR \
     F(DownloadMediaToDisk, WebCore::ContextMenuItemTagDownloadMediaToDisk) SEPARATOR \
     F(CopyMediaUrlToClipboard, WebCore::ContextMenuItemTagCopyMediaLinkToClipboard) SEPARATOR \
     F(ToggleMediaControls, WebCore::ContextMenuItemTagToggleMediaControls) SEPARATOR \
@@ -257,7 +255,7 @@ public:
             Checkable = 2,
             Checked = 4
         };
-        Q_DECLARE_FLAGS(Traits, Trait);
+        Q_DECLARE_FLAGS(Traits, Trait)
         Traits traits;
         QList<MenuItemDescription> subMenu;
         QString title;
@@ -382,6 +380,7 @@ private:
     QNetworkAccessManager *networkManager;
     WebCore::DeviceOrientationClient* m_deviceOrientationClient;
     WebCore::DeviceMotionClient* m_deviceMotionClient;
+    VisibilityState m_visibilityState;
 
 public:
     static bool drtRun;

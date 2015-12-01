@@ -23,22 +23,17 @@
 #include "config.h"
 #include "UIEvent.h"
 
-#include "Console.h"
-#include "DOMWindow.h"
-#include "EventDispatcher.h"
 #include "Node.h"
 
 namespace WebCore {
 
 UIEventInit::UIEventInit()
-    : view(0)
-    , detail(0)
+    : detail(0)
 {
 }
 
 UIEventInit::UIEventInit(bool bubbles, bool cancelable)
     : EventInit(bubbles, cancelable)
-    , view(0)
     , detail(0)
 {
 }
@@ -90,9 +85,9 @@ bool UIEvent::isUIEvent() const
     return true;
 }
 
-const AtomicString& UIEvent::interfaceName() const
+EventInterface UIEvent::eventInterface() const
 {
-    return eventNames().interfaceForUIEvent;
+    return UIEventInterfaceType;
 }
 
 int UIEvent::keyCode() const

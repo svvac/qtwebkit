@@ -26,7 +26,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -49,7 +49,7 @@ Cursor::Cursor(const Cursor& other)
     , m_image(other.m_image)
     , m_hotSpot(other.m_hotSpot)
 #ifndef QT_NO_CURSOR
-    , m_platformCursor(other.m_platformCursor ? new QCursor(*other.m_platformCursor)  : 0)
+    , m_platformCursor(other.m_platformCursor ? new QCursor(*other.m_platformCursor) : 0)
 #endif
 {
 }
@@ -67,7 +67,7 @@ Cursor& Cursor::operator=(const Cursor& other)
     m_image = other.m_image;
     m_hotSpot = other.m_hotSpot;
 #ifndef QT_NO_CURSOR
-    m_platformCursor = other.m_platformCursor ? new QCursor(*other.m_platformCursor)  : 0;
+    m_platformCursor = other.m_platformCursor ? new QCursor(*other.m_platformCursor) : 0;
 #endif
     return *this;
 }

@@ -31,14 +31,14 @@
 
 namespace WebCore {
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation, FontWidthVariant, FontRenderingMode)
+FontPlatformData FontCustomPlatformData::fontPlatformData(const FontDescription& fontDescription, bool bold, bool italic, FontOrientation, FontWidthVariant)
 {
     Q_ASSERT(m_rawFont.isValid());
-    m_rawFont.setPixelSize(qreal(size));
+    m_rawFont.setPixelSize(qreal(fontDescription.computedSize()));
     return FontPlatformData(m_rawFont);
 }
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer)
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer* buffer)
 {
     ASSERT_ARG(buffer, buffer);
 
@@ -66,7 +66,7 @@ FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer)
     if (!rawFont.isValid())
         return 0;
 
-    FontCustomPlatformData *data = new FontCustomPlatformData;
+    std::unique_ptr<FontCustomPlatformData> data = std::make_unique<FontCustomPlatformData>();
     data->m_rawFont = rawFont;
     return data;
 }

@@ -34,6 +34,7 @@
 
 #include "Cursor.h"
 #include "Font.h"
+#include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HostWindow.h"
 #include "IntRect.h"
@@ -108,7 +109,7 @@ void Widget::hide()
         client->setWidgetVisible(this, false);
 }
 
-void Widget::paint(GraphicsContext*, const IntRect&)
+void Widget::paint(GraphicsContext&, const IntRect&)
 {
 }
 

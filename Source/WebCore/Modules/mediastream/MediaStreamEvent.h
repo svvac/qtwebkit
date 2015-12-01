@@ -43,13 +43,13 @@ class MediaStreamEvent : public Event {
 public:
     virtual ~MediaStreamEvent();
 
-    static PassRefPtr<MediaStreamEvent> create();
-    static PassRefPtr<MediaStreamEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
-    static PassRefPtr<MediaStreamEvent> create(const AtomicString& type, const MediaStreamEventInit& initializer);
+    static Ref<MediaStreamEvent> create();
+    static Ref<MediaStreamEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
+    static Ref<MediaStreamEvent> create(const AtomicString& type, const MediaStreamEventInit& initializer);
 
     MediaStream* stream() const;
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const;
 
 private:
     MediaStreamEvent();

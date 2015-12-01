@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY IGALIA S.L. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,7 +34,7 @@
 #include <glib/gi18n-lib.h>
 #include <libsecret/secret.h>
 #include <libsoup/soup.h>
-#include <wtf/gobject/GOwnPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 #endif
 
@@ -42,17 +42,21 @@ namespace WebCore {
 
 CredentialBackingStore& credentialBackingStore()
 {
-    DEFINE_STATIC_LOCAL(CredentialBackingStore, backingStore, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(CredentialBackingStore, backingStore, ());
     return backingStore;
 }
 
 #if ENABLE(CREDENTIAL_STORAGE)
 static GRefPtr<GHashTable> createAttributeHashTableFromChallenge(const AuthenticationChallenge& challenge, const Credential& credential = Credential())
 {
+    const char* realm = soup_auth_get_realm(challenge.soupAuth());
+    if (!realm)
+        return nullptr;
+
     SoupURI* uri = soup_message_get_uri(challenge.soupMessage());
     GRefPtr<GHashTable> attributes = adoptGRef(secret_attributes_build(
         SECRET_SCHEMA_COMPAT_NETWORK,
-        "domain", soup_auth_get_realm(challenge.soupAuth()),
+        "domain", realm,
         "server", uri->host,
         "protocol", uri->scheme,
         "authtype", soup_auth_get_scheme_name(challenge.soupAuth()),
@@ -76,8 +80,8 @@ static void credentialForChallengeAsyncReadyCallback(SecretService* service, GAs
     void* data = callbackData->data;
     delete callbackData;
 
-    GOwnPtr<GError> error;
-    GOwnPtr<GList> elements(secret_service_search_finish(service, asyncResult, &error.outPtr()));
+    GUniqueOutPtr<GError> error;
+    GUniquePtr<GList> elements(secret_service_search_finish(service, asyncResult, &error.outPtr()));
     if (error || !elements || !elements->data) {
         callback(Credential(), data);
         return;
@@ -109,15 +113,22 @@ void CredentialBackingStore::credentialForChallenge(const AuthenticationChalleng
     callbackData->callback = callback;
     callbackData->data = data;
 
+    GRefPtr<GHashTable> attributes = createAttributeHashTableFromChallenge(challenge);
+    if (!attributes) {
+        callback(Credential(), data);
+        return;
+    }
+
     secret_service_search(
         0, // The default SecretService.
         SECRET_SCHEMA_COMPAT_NETWORK,
-        createAttributeHashTableFromChallenge(challenge).get(),
+        attributes.get(),
         searchFlags,
         0, // cancellable
         reinterpret_cast<GAsyncReadyCallback>(credentialForChallengeAsyncReadyCallback),
         callbackData);
 #else
+    UNUSED_PARAM(challenge);
     callback(Credential(), data);
 #endif // ENABLE(CREDENTIAL_STORAGE)
 }
@@ -125,19 +136,26 @@ void CredentialBackingStore::credentialForChallenge(const AuthenticationChalleng
 void CredentialBackingStore::storeCredentialsForChallenge(const AuthenticationChallenge& challenge, const Credential& credential)
 {
 #if ENABLE(CREDENTIAL_STORAGE)
+    GRefPtr<GHashTable> attributes = createAttributeHashTableFromChallenge(challenge, credential);
+    if (!attributes)
+        return;
+
     CString utf8Password = credential.password().utf8();
     GRefPtr<SecretValue> newSecretValue = adoptGRef(secret_value_new(utf8Password.data(), utf8Password.length(), "text/plain"));
 
     secret_service_store(
         0, // The default SecretService.
         SECRET_SCHEMA_COMPAT_NETWORK,
-        createAttributeHashTableFromChallenge(challenge, credential).get(),
+        attributes.get(),
         SECRET_COLLECTION_DEFAULT,
         _("WebKitGTK+ password"),
         newSecretValue.get(),
         0, // cancellable
         0, // callback
         0); // data
+#else
+    UNUSED_PARAM(challenge);
+    UNUSED_PARAM(credential);
 #endif // ENABLE(CREDENTIAL_STORAGE)
 }
 

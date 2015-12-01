@@ -35,6 +35,7 @@
 #include "AuthenticationClient.h"
 #include "SocketStreamHandleBase.h"
 #include <wtf/RetainPtr.h>
+#include <wtf/ThreadSafeRefCounted.h>
 
 typedef struct __CFHTTPMessage* CFHTTPMessageRef;
 
@@ -42,11 +43,13 @@ namespace WebCore {
 
 class AuthenticationChallenge;
 class Credential;
+class NetworkingContext;
+class ProtectionSpace;
 class SocketStreamHandleClient;
 
 class SocketStreamHandle : public ThreadSafeRefCounted<SocketStreamHandle>, public SocketStreamHandleBase, public AuthenticationClient {
 public:
-    static PassRefPtr<SocketStreamHandle> create(const KURL& url, SocketStreamHandleClient* client) { return adoptRef(new SocketStreamHandle(url, client)); }
+    static PassRefPtr<SocketStreamHandle> create(const URL& url, SocketStreamHandleClient* client, NetworkingContext& networkingContext) { return adoptRef(new SocketStreamHandle(url, client, networkingContext)); }
 
     virtual ~SocketStreamHandle();
 
@@ -57,7 +60,7 @@ private:
     virtual int platformSend(const char* data, int length);
     virtual void platformClose();
 
-    SocketStreamHandle(const KURL&, SocketStreamHandleClient*);
+    SocketStreamHandle(const URL&, SocketStreamHandleClient*, NetworkingContext&);
     void createStreams();
     void scheduleStreams();
     void chooseProxy();
@@ -66,7 +69,6 @@ private:
     void removePACRunLoopSource();
     RetainPtr<CFRunLoopSourceRef> m_pacRunLoopSource;
     static void pacExecutionCallback(void* client, CFArrayRef proxyList, CFErrorRef error);
-    static void pacExecutionCallbackMainThread(void*);
     static CFStringRef copyPACExecutionDescription(void*);
 
     bool shouldUseSSL() const { return m_url.protocolIs("wss"); }
@@ -79,19 +81,19 @@ private:
     static CFStringRef copyCFStreamDescription(void*);
     static void readStreamCallback(CFReadStreamRef, CFStreamEventType, void*);
     static void writeStreamCallback(CFWriteStreamRef, CFStreamEventType, void*);
-#if PLATFORM(WIN)
-    static void readStreamCallbackMainThread(void*);
-    static void writeStreamCallbackMainThread(void*);
-#endif
     void readStreamCallback(CFStreamEventType);
     void writeStreamCallback(CFStreamEventType);
 
     void reportErrorToClient(CFErrorRef);
 
+    bool getStoredCONNECTProxyCredentials(const ProtectionSpace&, String& login, String& password);
+
     // No authentication for streams per se, but proxy may ask for credentials.
     virtual void receivedCredential(const AuthenticationChallenge&, const Credential&);
     virtual void receivedRequestToContinueWithoutCredential(const AuthenticationChallenge&);
     virtual void receivedCancellation(const AuthenticationChallenge&);
+    virtual void receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&);
+    virtual void receivedChallengeRejection(const AuthenticationChallenge&);
 
     virtual void refAuthenticationClient() { ref(); }
     virtual void derefAuthenticationClient() { deref(); }
@@ -110,6 +112,8 @@ private:
     RetainPtr<CFWriteStreamRef> m_writeStream;
 
     RetainPtr<CFURLRef> m_httpsURL; // ws(s): replaced with https:
+
+    Ref<NetworkingContext> m_networkingContext;
 };
 
 }  // namespace WebCore

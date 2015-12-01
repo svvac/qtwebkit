@@ -24,7 +24,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -32,6 +32,8 @@
 
 #include "GraphicsContext.h"
 #include "ImageData.h"
+#include "IntSize.h"
+#include "IntRect.h"
 #include "MIMETypeRegistry.h"
 #include "StillImageQt.h"
 #include "TransparencyLayer.h"
@@ -61,16 +63,17 @@ ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, Color
 }
 #endif
 
-ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode /*renderingMode*/, bool& success)
-    : m_data(size)
-    , m_size(size)
+ImageBuffer::ImageBuffer(const FloatSize& size, float /* resolutionScale */, ColorSpace, RenderingMode /*renderingMode*/, bool& success)
+    : m_data(IntSize(size))
     , m_logicalSize(size)
 {
+    m_size = IntSize(size);
+
     success = m_data.m_painter && m_data.m_painter->isActive();
     if (!success)
         return;
 
-    m_context = adoptPtr(new GraphicsContext(m_data.m_painter));
+    m_context = std::make_unique<GraphicsContext>(m_data.m_painter);
 }
 
 ImageBuffer::~ImageBuffer()
@@ -88,14 +91,14 @@ PassOwnPtr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size,
 }
 #endif
 
-GraphicsContext* ImageBuffer::context() const
+GraphicsContext& ImageBuffer::context() const
 {
     ASSERT(m_data.m_painter->isActive());
 
-    return m_context.get();
+    return *m_context.get();
 }
 
-PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
+RefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
 {
     if (copyBehavior == CopyBackingStore)
         return m_data.m_impl->copyImage();
@@ -108,19 +111,20 @@ BackingStoreCopy ImageBuffer::fastCopyImageMode()
     return DontCopyBackingStore;
 }
 
-void ImageBuffer::draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
+void ImageBuffer::draw(GraphicsContext& destContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
                        CompositeOperator op, BlendMode blendMode, bool useLowQualityScale)
 {
-    m_data.m_impl->draw(destContext, styleColorSpace, destRect, srcRect, op, blendMode, useLowQualityScale, destContext == context());
+    m_data.m_impl->draw(destContext, styleColorSpace, destRect, srcRect, op, blendMode, useLowQualityScale, false);
 }
 
-void ImageBuffer::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                              const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator op, const FloatRect& destRect)
+void ImageBuffer::drawPattern(GraphicsContext& destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
+                              const FloatPoint& phase, const FloatSize& spacing, ColorSpace styleColorSpace,
+                              CompositeOperator op, const FloatRect& destRect, BlendMode)
 {
-    m_data.m_impl->drawPattern(destContext, srcRect, patternTransform, phase, styleColorSpace, op, destRect, destContext == context());
+    m_data.m_impl->drawPattern(destContext, srcRect, patternTransform, phase, spacing, styleColorSpace, op, destRect, false);
 }
 
-void ImageBuffer::clip(GraphicsContext* context, const FloatRect& floatRect) const
+void ImageBuffer::clip(GraphicsContext& context, const FloatRect& floatRect) const
 {
     m_data.m_impl->clip(context, floatRect);
 }

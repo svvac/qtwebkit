@@ -28,7 +28,6 @@
 #include "config.h"
 #include "EventHandler.h"
 
-#include "Clipboard.h"
 #include "Cursor.h"
 #include "Document.h"
 #include "EventNames.h"
@@ -65,10 +64,10 @@ bool EventHandler::tabsToAllFormControls(KeyboardEvent* event) const
 
 void EventHandler::focusDocumentView()
 {
-    Page* page = m_frame->page();
+    Page* page = m_frame.page();
     if (!page)
         return;
-    page->focusController()->setFocusedFrame(m_frame);
+    page->focusController().setFocusedFrame(&m_frame);
 }
 
 bool EventHandler::passWidgetMouseDownEventToWidget(const MouseEventWithHitTestResults&)
@@ -85,35 +84,29 @@ bool EventHandler::eventActivatedView(const PlatformMouseEvent&) const
     return false;
 }
 
-bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& event, Widget* widget)
+bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& wheelEvent, Widget& widget)
 {
-    Q_ASSERT(widget);
-    if (!widget->isFrameView())
+    if (!is<FrameView>(widget))
         return false;
 
-    return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(event);
-}
-
-PassRefPtr<Clipboard> EventHandler::createDraggingClipboard() const
-{
-    return Clipboard::createForDragAndDrop();
+    return downcast<FrameView>(widget).frame().eventHandler().handleWheelEvent(wheelEvent);
 }
 
 bool EventHandler::passMousePressEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)
 {
-    subframe->eventHandler()->handleMousePressEvent(mev.event());
+    subframe->eventHandler().handleMousePressEvent(mev.event());
     return true;
 }
 
 bool EventHandler::passMouseMoveEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe, HitTestResult* hoveredNode)
 {
-    subframe->eventHandler()->handleMouseMoveEvent(mev.event(), hoveredNode);
+    subframe->eventHandler().handleMouseMoveEvent(mev.event(), hoveredNode);
     return true;
 }
 
 bool EventHandler::passMouseReleaseEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)
 {
-    subframe->eventHandler()->handleMouseReleaseEvent(mev.event());
+    subframe->eventHandler().handleMouseReleaseEvent(mev.event());
     return true;
 }
 

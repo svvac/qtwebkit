@@ -20,7 +20,6 @@
 #include "qt_pixmapruntime.h"
 
 #include "APICast.h"
-#include "APIShims.h"
 #include "CachedImage.h"
 #include "HTMLImageElement.h"
 #include "ImageData.h"
@@ -31,6 +30,7 @@
 #include "JSImageData.h"
 #include "JSRetainPtr.h"
 #include "JavaScript.h"
+#include "RenderElement.h"
 #include "StillImageQt.h"
 #include <QBuffer>
 #include <QByteArray>
@@ -122,6 +122,8 @@ static JSValueRef getPixmapHeight(JSContextRef context, JSObjectRef object, JSSt
 
 static JSValueRef assignToHTMLImageElement(JSContextRef context, JSObjectRef function, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
+    Q_UNUSED(function)
+
     if (!argumentCount)
         return JSValueMakeUndefined(context);
 
@@ -131,15 +133,15 @@ static JSValueRef assignToHTMLImageElement(JSContextRef context, JSObjectRef fun
 
     JSObject* jsObject = ::toJS(objectArg);
 
-    if (!jsObject->inherits(&JSHTMLImageElement::s_info))
+    if (!jsObject->inherits(JSHTMLImageElement::info()))
         return JSValueMakeUndefined(context);
 
-    QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
+    //QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
 
     // We now know that we have a valid <img> element as the argument, we can attach the pixmap to it.
-    RefPtr<StillImage> stillImage = WebCore::StillImage::create(toPixmap(data));
-    HTMLImageElement* imageElement = toHTMLImageElement(static_cast<JSHTMLImageElement*>(jsObject)->impl());
-    imageElement->setCachedImage(new CachedImage(stillImage.get()));
+    //RefPtr<StillImage> stillImage = WebCore::StillImage::create(toPixmap(data));
+    //HTMLImageElement* imageElement = toHTMLImageElement(static_cast<JSHTMLImageElement*>(jsObject)->impl());
+    //imageElement->setCasetCachedImage(new CachedImage(stillImage.get()));
     return JSValueMakeUndefined(context);
 }
 
@@ -151,7 +153,6 @@ static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef function, 
     int height = image.height();
 
     JSC::ExecState* exec = ::toJS(context);
-    APIEntryShim entryShim(exec);
 
     RefPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
     copyPixelsInto(image, width, height, imageData->data()->data());
@@ -218,20 +219,20 @@ QVariant QtPixmapRuntime::toQt(JSContextRef context, JSObjectRef obj, QMetaType:
     }
 
     JSObject* jsObject = ::toJS(obj);
-    if (!jsObject->inherits(&JSHTMLImageElement::s_info))
+    if (!jsObject->inherits(JSHTMLImageElement::info()))
         return emptyVariantForHint(hint);
 
     JSHTMLImageElement* elementJSWrapper = static_cast<JSHTMLImageElement*>(jsObject);
-    HTMLImageElement* imageElement = toHTMLImageElement(elementJSWrapper->impl());
+    if (!elementJSWrapper)
+      return emptyVariantForHint(hint);
 
-    if (!imageElement)
-        return emptyVariantForHint(hint);
+    HTMLImageElement& imageElement = elementJSWrapper->wrapped();
 
-    CachedImage* cachedImage = imageElement->cachedImage();
+    CachedImage* cachedImage = imageElement.cachedImage();
     if (!cachedImage)
         return emptyVariantForHint(hint);
 
-    Image* image = cachedImage->imageForRenderer(imageElement->renderer());
+    Image* image = cachedImage->imageForRenderer(imageElement.renderer());
     if (!image)
         return emptyVariantForHint(hint);
 

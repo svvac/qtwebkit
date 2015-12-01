@@ -26,7 +26,7 @@
 #include "config.h"
 #include "Gamepads.h"
 
-#if ENABLE(GAMEPAD)
+#if ENABLE(GAMEPAD_DEPRECATED)
 
 #include "GamepadDeviceLinux.h"
 #include "GamepadList.h"
@@ -34,9 +34,8 @@
 #include <gio/gunixinputstream.h>
 #include <gudev/gudev.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/gobject/GOwnPtr.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
 
@@ -44,15 +43,10 @@ namespace WebCore {
 
 class GamepadDeviceGtk : public GamepadDeviceLinux {
 public:
-    static PassOwnPtr<GamepadDeviceGtk> create(String deviceFile)
-    {
-        return adoptPtr(new GamepadDeviceGtk(deviceFile));
-    }
+    explicit GamepadDeviceGtk(String deviceFile);
     ~GamepadDeviceGtk();
 
 private:
-    GamepadDeviceGtk(String deviceFile);
-
     static gboolean readCallback(GObject* pollableStream, gpointer data);
     GRefPtr<GInputStream> m_inputStream;
     GRefPtr<GSource> m_source;
@@ -79,7 +73,7 @@ GamepadDeviceGtk::~GamepadDeviceGtk()
 gboolean GamepadDeviceGtk::readCallback(GObject* pollableStream, gpointer data)
 {
     GamepadDeviceGtk* gamepadDevice = reinterpret_cast<GamepadDeviceGtk*>(data);
-    GOwnPtr<GError> error;
+    GUniqueOutPtr<GError> error;
     struct js_event event;
 
     gssize len = g_pollable_input_stream_read_nonblocking(G_POLLABLE_INPUT_STREAM(pollableStream),
@@ -98,7 +92,7 @@ gboolean GamepadDeviceGtk::readCallback(GObject* pollableStream, gpointer data)
 
 class GamepadsGtk {
 public:
-    GamepadsGtk(unsigned length);
+    explicit GamepadsGtk(unsigned length);
 
     void registerDevice(String deviceFile);
     void unregisterDevice(String deviceFile);
@@ -110,7 +104,7 @@ private:
     static void onUEventCallback(GUdevClient*, gchar* action, GUdevDevice*, gpointer data);
     static gboolean isGamepadDevice(GUdevDevice*);
 
-    Vector<OwnPtr<GamepadDeviceGtk> > m_slots;
+    Vector<std::unique_ptr<GamepadDeviceGtk> > m_slots;
     HashMap<String, GamepadDeviceGtk*> m_deviceMap;
 
     GRefPtr<GUdevClient> m_gudevClient;
@@ -123,7 +117,7 @@ GamepadsGtk::GamepadsGtk(unsigned length)
     m_gudevClient = adoptGRef(g_udev_client_new(subsystems));
     g_signal_connect(m_gudevClient.get(), "uevent", G_CALLBACK(onUEventCallback), this);
 
-    GOwnPtr<GList> devicesList(g_udev_client_query_by_subsystem(m_gudevClient.get(), subsystems[0]));
+    GUniquePtr<GList> devicesList(g_udev_client_query_by_subsystem(m_gudevClient.get(), subsystems[0]));
     for (GList* listItem = devicesList.get(); listItem; listItem = g_list_next(listItem)) {
         GUdevDevice* device = G_UDEV_DEVICE(listItem->data);
         String deviceFile = String::fromUTF8(g_udev_device_get_device_file(device));
@@ -145,7 +139,7 @@ void GamepadsGtk::registerDevice(String deviceFile)
 
     for (unsigned index = 0; index < m_slots.size(); index++) {
         if (!m_slots[index]) {
-            m_slots[index] = GamepadDeviceGtk::create(deviceFile);
+            m_slots[index] = std::make_unique<GamepadDeviceGtk>(deviceFile);
             m_deviceMap.add(deviceFile, m_slots[index].get());
             break;
         }
@@ -161,7 +155,7 @@ void GamepadsGtk::unregisterDevice(String deviceFile)
     size_t index = m_slots.find(gamepadDevice);
     ASSERT(index != notFound);
 
-    m_slots[index].clear();
+    m_slots[index] = nullptr;
 }
 
 void GamepadsGtk::updateGamepadList(GamepadList* into)
@@ -187,7 +181,7 @@ void GamepadsGtk::updateGamepadList(GamepadList* into)
     }
 }
 
-void GamepadsGtk::onUEventCallback(GUdevClient* udevClient, gchar* action, GUdevDevice* device, gpointer data)
+void GamepadsGtk::onUEventCallback(GUdevClient*, gchar* action, GUdevDevice* device, gpointer data)
 {
     if (!isGamepadDevice(device))
         return;
@@ -216,10 +210,10 @@ gboolean GamepadsGtk::isGamepadDevice(GUdevDevice* device)
 
 void sampleGamepads(GamepadList* into)
 {
-    DEFINE_STATIC_LOCAL(GamepadsGtk, gamepadsGtk, (into->length()));
+    DEPRECATED_DEFINE_STATIC_LOCAL(GamepadsGtk, gamepadsGtk, (into->length()));
     gamepadsGtk.updateGamepadList(into);
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(GAMEPAD)
+#endif // ENABLE(GAMEPAD_DEPRECATED)

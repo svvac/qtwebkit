@@ -36,21 +36,22 @@
 #include "HitTestResult.h"
 #include "InspectorController.h"
 #include "JSDOMWindowBase.h"
-#include "KURL.h"
+#include "URL.h"
 #include "NavigationScheduler.h"
 #include "NetworkingContext.h"
 #include "NodeList.h"
 #include "Page.h"
 #include "QWebPageAdapter.h"
 #include "RenderObject.h"
+#include "RenderView.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
+#include "ScrollableArea.h"
 #include "SubstituteData.h"
 #include "TextureMapperLayerClientQt.h"
 #include "TiledBackingStore.h"
 #if ENABLE(GESTURE_EVENTS)
-#include "PlatformGestureEvent.h"
 #include "WebEventConversion.h"
 #endif
 #include "htmlediting.h"
@@ -94,9 +95,9 @@ QWebFrameData::QWebFrameData(WebCore::Page* parentPage, WebCore::Frame* parentFr
     frame = Frame::create(page, ownerElement, frameLoaderClient);
 
     // FIXME: All of the below should probably be moved over into WebCore
-    frame->tree()->setName(name);
+    frame->tree().setName(name);
     if (parentFrame)
-        parentFrame->tree()->appendChild(frame);
+        parentFrame->tree().appendChild(frame);
 }
 
 QWebFrameAdapter::QWebFrameAdapter()
@@ -119,7 +120,7 @@ QWebFrameAdapter::~QWebFrameAdapter()
 
 void QWebFrameAdapter::load(const QNetworkRequest& req, QNetworkAccessManager::Operation operation, const QByteArray& body)
 {
-    if (frame->tree()->parent())
+    if (frame->tree().parent())
         pageAdapter->insideOpenCall = true;
 
     QUrl url = ensureAbsoluteUrl(req.url());
@@ -165,11 +166,11 @@ void QWebFrameAdapter::load(const QNetworkRequest& req, QNetworkAccessManager::O
     }
 
     if (!body.isEmpty())
-        request.setHTTPBody(WebCore::FormData::create(body.constData(), body.size()));
+        request.setHTTPBody(FormData::create(body.constData(), body.size()));
 
-    frame->loader()->load(WebCore::FrameLoadRequest(frame, request));
+    frame->loader().load(FrameLoadRequest(frame, request, ShouldOpenExternalURLsPolicy::ShouldAllow));
 
-    if (frame->tree()->parent())
+    if (frame->tree().parent())
         pageAdapter->insideOpenCall = false;
 }
 
@@ -181,35 +182,25 @@ bool QWebFrameAdapter::hasView() const
 #if ENABLE(GESTURE_EVENTS)
 void QWebFrameAdapter::handleGestureEvent(QGestureEventFacade* gestureEvent)
 {
-    ASSERT(frame && frame->view());
-    switch (gestureEvent->type) {
-    case Qt::TapGesture:
-        frame->eventHandler()->handleGestureEvent(convertGesture(gestureEvent));
-        break;
-    case Qt::TapAndHoldGesture:
-        frame->eventHandler()->sendContextMenuEventForGesture(convertGesture(gestureEvent));
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-    }
+    notImplemented();
 }
 #endif
 
 QVariant QWebFrameAdapter::evaluateJavaScript(const QString &scriptSource, const QString &location)
 {
-    ScriptController* scriptController = frame->script();
+    ScriptController& scriptController = frame->script();
     QVariant rc;
 
-    if (scriptController) {
+    //if (scriptController.canExecuteScripts()) {
         int distance = 0;
-        ScriptValue value = scriptController->executeScript(ScriptSourceCode(scriptSource, String(location)));
-        JSC::ExecState* exec = scriptController->globalObject(mainThreadNormalWorld())->globalExec();
+        Deprecated::ScriptValue value = scriptController.executeScript(ScriptSourceCode(String(scriptSource), URL(location)));
+        JSC::ExecState* exec = scriptController.globalObject(mainThreadNormalWorld())->globalExec();
         JSValueRef* ignoredException = 0;
         exec->vm().apiLock().lock();
         JSValueRef valueRef = toRef(exec, value.jsValue());
         exec->vm().apiLock().unlock();
         rc = JSC::Bindings::convertValueToQVariant(toRef(exec), valueRef, QMetaType::Void, &distance, ignoredException);
-    }
+    //}
 
     return rc;
 }
@@ -222,9 +213,9 @@ void QWebFrameAdapter::addToJavaScriptWindowObject(const QString& name, QObject*
     JSDOMWindow* window = toJSDOMWindow(frame, mainThreadNormalWorld());
     JSC::Bindings::RootObject* root;
     if (valueOwnership == JSC::Bindings::QtInstance::QtOwnership)
-        root = frame->script()->cacheableBindingRootObject();
+        root = frame->script().cacheableBindingRootObject();
     else
-        root = frame->script()->bindingRootObject();
+        root = frame->script().bindingRootObject();
 
     if (!window) {
         qDebug() << "Warning: couldn't get window object";
@@ -240,15 +231,16 @@ void QWebFrameAdapter::addToJavaScriptWindowObject(const QString& name, QObject*
 
     JSC::JSObject* runtimeObject = JSC::Bindings::QtInstance::getQtInstance(object, root, valueOwnership)->createRuntimeObject(exec);
 
-    JSC::PutPropertySlot slot;
-    window->methodTable()->put(window, exec, JSC::Identifier(&exec->vm(), reinterpret_cast_ptr<const UChar*>(name.constData()), name.length()), runtimeObject, slot);
+    JSC::PutPropertySlot slot(runtimeObject);
+    JSC::Identifier propName = JSC::Identifier::fromString(exec, String(name));
+    window->methodTable()->put(window, exec, propName, runtimeObject, slot);
 }
 
 QString QWebFrameAdapter::toHtml() const
 {
     if (!frame->document())
         return QString();
-    return createMarkup(frame->document());
+    return createMarkup(*frame->document());
 }
 
 QString QWebFrameAdapter::toPlainText() const
@@ -264,7 +256,9 @@ QString QWebFrameAdapter::toPlainText() const
 
 void QWebFrameAdapter::setContent(const QByteArray &data, const QString &mimeType, const QUrl &baseUrl)
 {
-    KURL kurl(baseUrl);
+    notImplemented();
+    /*
+    URL kurl(baseUrl);
     WebCore::ResourceRequest request(kurl);
     WTF::RefPtr<WebCore::SharedBuffer> buffer = WebCore::SharedBuffer::create(data.constData(), data.length());
     QString actualMimeType;
@@ -275,18 +269,23 @@ void QWebFrameAdapter::setContent(const QByteArray &data, const QString &mimeTyp
         actualMimeType = extractMIMETypeFromMediaType(mimeType);
         encoding = extractCharsetFromMediaType(mimeType);
     }
-    WebCore::SubstituteData substituteData(buffer, WTF::String(actualMimeType), encoding, KURL());
-    frame->loader()->load(WebCore::FrameLoadRequest(frame, request, substituteData));
+    WebCore::SubstituteData substituteData(buffer.release(),
+                                           kurl, );
+    frame->loader().load(FrameLoadRequest(frame, request, substituteData));
+    */
 }
 
 void QWebFrameAdapter::setHtml(const QString &html, const QUrl &baseUrl)
 {
-    KURL kurl(baseUrl);
-    WebCore::ResourceRequest request(kurl);
+    notImplemented();
+    /*
+    URL url(baseUrl);
+    WebCore::ResourceRequest request(url);
     const QByteArray utf8 = html.toUtf8();
     WTF::RefPtr<WebCore::SharedBuffer> data = WebCore::SharedBuffer::create(utf8.constData(), utf8.length());
-    WebCore::SubstituteData substituteData(data, WTF::String("text/html"), WTF::String("utf-8"), KURL());
-    frame->loader()->load(WebCore::FrameLoadRequest(frame, request, substituteData));
+    WebCore::SubstituteData substituteData(data, URL(String("text/html"), WTF::String("utf-8"), URL());
+    frame->loader().load(FrameLoadRequest(frame, request, substituteData));
+    */
 }
 
 QMultiMap<QString, QString> QWebFrameAdapter::metaData() const
@@ -366,16 +365,11 @@ void QWebFrameAdapter::init(QWebPageAdapter* pageAdapter, QWebFrameData* frameDa
     frame->init();
 }
 
-QWebFrameAdapter* QWebFrameAdapter::kit(const Frame* frame)
-{
-    return static_cast<FrameLoaderClientQt*>(frame->loader()->client())->webFrame();
-}
-
 QUrl QWebFrameAdapter::ensureAbsoluteUrl(const QUrl& url)
 {
     // FIXME: it would be nice if we could avoid doing this.
     // Convert to KURL and back to preserve the old behavior (e.g. fixup of single slash in 'http:/')
-    QUrl validatedUrl = KURL(url);
+    QUrl validatedUrl = URL(url);
 
     if (!validatedUrl.isValid() || !validatedUrl.isRelative())
         return validatedUrl;
@@ -396,7 +390,7 @@ QWebHitTestResultPrivate* QWebFrameAdapter::hitTestContent(const QPoint& pos) co
     if (!frame->view() || !frame->contentRenderer())
         return 0;
 
-    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(frame->view()->windowToContents(pos), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
+    HitTestResult result = frame->eventHandler().hitTestResultAtPoint(frame->view()->windowToContents(pos), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
 
     if (result.scrollbar())
         return 0;
@@ -414,16 +408,16 @@ QWebElement QWebFrameAdapter::documentElement() const
 QString QWebFrameAdapter::title() const
 {
     if (frame->document())
-        return frame->loader()->documentLoader()->title().string();
+        return frame->loader().documentLoader()->title().string();
     return QString();
 }
 
 void QWebFrameAdapter::clearCoreFrame()
 {
-    DocumentLoader* documentLoader = frame->loader()->activeDocumentLoader();
+    DocumentLoader* documentLoader = frame->loader().activeDocumentLoader();
     Q_ASSERT(documentLoader);
-    documentLoader->writer()->begin();
-    documentLoader->writer()->end();
+    documentLoader->writer().begin();
+    documentLoader->writer().end();
 }
 
 
@@ -468,7 +462,7 @@ QWebSecurityOrigin QWebFrameAdapter::securityOrigin() const
 
 QString QWebFrameAdapter::uniqueName() const
 {
-    return frame->tree()->uniqueName();
+    return frame->tree().uniqueName();
 }
 
 // This code is copied from ChromeClientGtk.cpp.
@@ -536,7 +530,7 @@ void QWebFrameAdapter::renderRelativeCoords(QPainter* painter, int layers, const
             rect.translate(scrollX, scrollY);
             context.clip(view->visibleContentRect());
 
-            view->paintContents(&context, rect);
+            view->paintContents(context, rect);
 
             context.restore();
         }
@@ -546,9 +540,9 @@ void QWebFrameAdapter::renderRelativeCoords(QPainter* painter, int layers, const
     }
     renderFrameExtras(&context, layers, clip);
 #if ENABLE(INSPECTOR)
-    if (frame->page()->inspectorController()->highlightedNode()) {
+    if (frame->page()->inspectorController().highlightedNode()) {
         context.save();
-        frame->page()->inspectorController()->drawHighlight(context);
+        frame->page()->inspectorController().drawHighlight(context);
         context.restore();
     }
 #endif
@@ -579,13 +573,13 @@ void QWebFrameAdapter::renderFrameExtras(WebCore::GraphicsContext* context, int 
             QRect rect = intersectedRect;
             context->translate(x, y);
             rect.translate(-x, -y);
-            view->paintScrollbars(context, rect);
+            view->paintScrollbars(*context, rect);
             context->translate(-x, -y);
         }
 
 #if ENABLE(PAN_SCROLLING)
         if (layers & PanIconLayer)
-            view->paintPanScrollIcon(context);
+            view->paintPanScrollIcon(*context);
 #endif
 
         painter->restore();
@@ -695,10 +689,10 @@ QList<QObject*> QWebFrameAdapter::childFrames() const
 {
     QList<QObject*> originatingObjects;
     if (frame) {
-        FrameTree* tree = frame->tree();
-        for (Frame* child = tree->firstChild(); child; child = child->tree()->nextSibling()) {
-            FrameLoader* loader = child->loader();
-            originatingObjects.append(loader->networkingContext()->originatingObject());
+        FrameTree& tree = frame->tree();
+        for (Frame* child = tree.firstChild(); child; child = child->tree().nextSibling()) {
+            FrameLoader& loader = child->loader();
+            originatingObjects.append(loader.networkingContext()->originatingObject());
         }
     }
     return originatingObjects;
@@ -706,13 +700,13 @@ QList<QObject*> QWebFrameAdapter::childFrames() const
 
 bool QWebFrameAdapter::hasFocus() const
 {
-    Frame* ff = frame->page()->focusController()->focusedFrame();
+    Frame* ff = frame->page()->focusController().focusedFrame();
     return ff && QWebFrameAdapter::kit(ff) == this;
 }
 
 void QWebFrameAdapter::setFocus()
 {
-    frame->page()->focusController()->setFocusedFrame(frame);
+    frame->page()->focusController().setFocusedFrame(frame);
 }
 
 void QWebFrameAdapter::setScrollBarPolicy(Qt::Orientation orientation, Qt::ScrollBarPolicy policy)
@@ -753,20 +747,20 @@ void QWebFrameAdapter::scrollBy(int dx, int dy)
 void QWebFrameAdapter::setScrollBarValue(Qt::Orientation orientation, int value)
 {
     Scrollbar* sb;
-    sb = (orientation == Qt::Horizontal) ? horizontalScrollBar() : verticalScrollBar();
+    sb = (orientation == Qt::Horizontal) ? scrollableArea()->horizontalScrollbar() : scrollableArea()->verticalScrollbar();
     if (sb) {
         if (value < 0)
             value = 0;
         else if (value > scrollBarMaximum(orientation))
             value = scrollBarMaximum(orientation);
-        sb->scrollableArea()->scrollToOffsetWithoutAnimation(orientation == Qt::Horizontal ? HorizontalScrollbar : VerticalScrollbar, value);
+        sb->scrollableArea().scrollToOffsetWithoutAnimation(orientation == Qt::Horizontal ? HorizontalScrollbar : VerticalScrollbar, value);
     }
 }
 
 int QWebFrameAdapter::scrollBarValue(Qt::Orientation orientation) const
 {
     Scrollbar* sb;
-    sb = (orientation == Qt::Horizontal) ? horizontalScrollBar() : verticalScrollBar();
+    sb = (orientation == Qt::Horizontal) ? scrollableArea()->horizontalScrollbar() : scrollableArea()->verticalScrollbar();
     if (sb)
         return sb->value();
     return 0;
@@ -775,7 +769,7 @@ int QWebFrameAdapter::scrollBarValue(Qt::Orientation orientation) const
 int QWebFrameAdapter::scrollBarMaximum(Qt::Orientation orientation) const
 {
     Scrollbar* sb;
-    sb = (orientation == Qt::Horizontal) ? horizontalScrollBar() : verticalScrollBar();
+    sb = (orientation == Qt::Horizontal) ? scrollableArea()->horizontalScrollbar() : scrollableArea()->verticalScrollbar();
     if (sb)
         return sb->maximum();
     return 0;
@@ -784,12 +778,13 @@ int QWebFrameAdapter::scrollBarMaximum(Qt::Orientation orientation) const
 QRect QWebFrameAdapter::scrollBarGeometry(Qt::Orientation orientation) const
 {
     Scrollbar* sb;
-    sb = (orientation == Qt::Horizontal) ? horizontalScrollBar() : verticalScrollBar();
+    sb = (orientation == Qt::Horizontal) ? scrollableArea()->horizontalScrollbar() : scrollableArea()->verticalScrollbar();
     if (sb)
         return sb->frameRect();
     return QRect();
 }
 
+/*
 WebCore::Scrollbar* QWebFrameAdapter::horizontalScrollBar() const
 {
     if (!frame->view())
@@ -802,8 +797,7 @@ WebCore::Scrollbar* QWebFrameAdapter::verticalScrollBar() const
     if (!frame->view())
         return 0;
     return frame->view()->verticalScrollbar();
-}
-
+}*/
 
 void QWebFrameAdapter::updateBackgroundRecursively(const QColor& backgroundColor)
 {
@@ -813,7 +807,7 @@ void QWebFrameAdapter::updateBackgroundRecursively(const QColor& backgroundColor
 
 void QWebFrameAdapter::cancelLoad()
 {
-    frame->navigationScheduler()->cancel();
+    frame->navigationScheduler().cancel();
 }
 
 // ========== QWebHitTestResultPrivate implementation ===========
@@ -929,7 +923,7 @@ QWebElement QWebHitTestResultPrivate::elementForInnerNode() const
     // Uses the similar logic as HitTestResult::innerElement().
     for (Node* node = innerNonSharedNode; node; node = node->parentNode()) {
         if (node->isElementNode())
-            return QWebElement(toElement(node));
+            return QWebElement(node);
     }
 
     return QWebElement();
@@ -967,7 +961,9 @@ void QWebFrameAdapter::setFixedVisibleContentRect(const QRect& rect)
     ASSERT(pageAdapter->mainFrameAdapter() == this);
     FrameView* view = frame->view();
     ASSERT(view);
-    view->setFixedVisibleContentRect(rect);
+#if USE(COORDINATED_GRAPHICS)
+    view->setFixedVisibleContentRect();
+#endif
 }
 
 void QWebFrameAdapter::setViewportSize(const QSize& size)

@@ -21,7 +21,7 @@
 #ifndef JSTestCallback_h
 #define JSTestCallback_h
 
-#if ENABLE(SQL_DATABASE)
+#if ENABLE(SPEECH_SYNTHESIS)
 
 #include "ActiveDOMCallback.h"
 #include "JSCallbackData.h"
@@ -32,18 +32,20 @@ namespace WebCore {
 
 class JSTestCallback : public TestCallback, public ActiveDOMCallback {
 public:
-    static PassRefPtr<JSTestCallback> create(JSC::JSObject* callback, JSDOMGlobalObject* globalObject)
+    static Ref<JSTestCallback> create(JSC::JSObject* callback, JSDOMGlobalObject* globalObject)
     {
-        return adoptRef(new JSTestCallback(callback, globalObject));
+        return adoptRef(*new JSTestCallback(callback, globalObject));
     }
 
     virtual ScriptExecutionContext* scriptExecutionContext() const { return ContextDestructionObserver::scriptExecutionContext(); }
 
     virtual ~JSTestCallback();
+    JSCallbackDataStrong* callbackData() { return m_data; }
+    static JSC::JSValue getConstructor(JSC::VM&, JSC::JSGlobalObject*);
 
     // Functions
     virtual bool callbackWithNoParam();
-    virtual bool callbackWithArrayParam(Float32Array* arrayParam);
+    virtual bool callbackWithArrayParam(RefPtr<Float32Array> arrayParam);
     virtual bool callbackWithSerializedScriptValueParam(PassRefPtr<SerializedScriptValue> srzParam, const String& strArg);
     COMPILE_ASSERT(false)    virtual int callbackWithNonBoolReturnType(const String& strArg);
     virtual int customCallback(Class5* class5Param, Class6* class6Param);
@@ -54,11 +56,14 @@ public:
 private:
     JSTestCallback(JSC::JSObject* callback, JSDOMGlobalObject*);
 
-    JSCallbackData* m_data;
+    JSCallbackDataStrong* m_data;
 };
+
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestCallback*);
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestCallback& impl) { return toJS(state, globalObject, &impl); }
 
 } // namespace WebCore
 
-#endif // ENABLE(SQL_DATABASE)
+#endif // ENABLE(SPEECH_SYNTHESIS)
 
 #endif

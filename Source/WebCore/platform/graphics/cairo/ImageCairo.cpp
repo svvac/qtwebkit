@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2007 Alp Toker <alp@atoker.com>
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
  *
@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -41,20 +41,15 @@
 
 namespace WebCore {
 
-void Image::drawPattern(GraphicsContext* context, const FloatRect& tileRect, const AffineTransform& patternTransform,
-    const FloatPoint& phase, ColorSpace, CompositeOperator op, const FloatRect& destRect, BlendMode)
+void Image::drawPattern(GraphicsContext& context, const FloatRect& tileRect, const AffineTransform& patternTransform,
+    const FloatPoint& phase, const FloatSize& spacing, ColorSpace colorSpace, CompositeOperator op, const FloatRect& destRect, BlendMode blendMode)
 {
-    RefPtr<cairo_surface_t> surface = nativeImageForCurrentFrame();
-    if (!surface) // If it's too early we won't have an image yet.
-        return;
-
-    cairo_t* cr = context->platformContext()->cr();
-    drawPatternToCairoContext(cr, surface.get(), size(), tileRect, patternTransform, phase, toCairoOperator(op), destRect);
+    context.drawPattern(*this, tileRect, patternTransform, phase, spacing, colorSpace, op, destRect, blendMode);
 
     if (imageObserver())
         imageObserver()->didDraw(this);
 }
 
-}
+} // namespace WebCore
 
 #endif // USE(CAIRO)

@@ -28,19 +28,14 @@
 #include "config.h"
 #include "ScrollbarTheme.h"
 
-#include "RenderThemeQt.h"
+#include "ScrollbarThemeQStyle.h"
 
 namespace WebCore {
 
-ScrollbarTheme* ScrollbarTheme::nativeTheme()
+ScrollbarTheme& ScrollbarTheme::nativeTheme()
 {
-    static ScrollbarTheme* theme = 0;
-    if (theme)
-        return theme;
-    theme = RenderThemeQt::customScrollbarTheme();
-    if (!theme)
-        theme = new ScrollbarTheme();
-    return theme;
+  static ScrollbarThemeQStyle theme;
+  return theme;
 }
 
 }

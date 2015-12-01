@@ -36,18 +36,26 @@ public:
     {
     }
 
-    ResourceResponse(const KURL& url, const String& mimeType, long long expectedLength, const String& textEncodingName, const String& filename)
-        : ResourceResponseBase(url, mimeType, expectedLength, textEncodingName, filename)
+    ResourceResponse(const URL& url, const String& mimeType, long long expectedLength, const String& textEncodingName)
+        : ResourceResponseBase(url, mimeType, expectedLength, textEncodingName)
     {
     }
 
     bool platformResponseIsUpToDate() const { return false; }
+    void setSuggestedFilename(const String& filename) { m_suggestedFilename = filename; }
 
 private:
     friend class ResourceResponseBase;
 
-    PassOwnPtr<CrossThreadResourceResponseData> doPlatformCopyData(PassOwnPtr<CrossThreadResourceResponseData> data) const { return data; }
-    void doPlatformAdopt(PassOwnPtr<CrossThreadResourceResponseData>) { }
+    std::unique_ptr<CrossThreadResourceResponseData> doPlatformCopyData(std::unique_ptr<CrossThreadResourceResponseData> data) const { return data; }
+    String platformSuggestedFilename() const
+    {
+        if (!m_suggestedFilename.isEmpty())
+            return m_suggestedFilename;
+        return httpHeaderField(HTTPHeaderName::ContentDisposition);
+    }
+    void doPlatformAdopt(std::unique_ptr<CrossThreadResourceResponseData>) { }
+    String m_suggestedFilename;
 };
 
 struct CrossThreadResourceResponseData : public CrossThreadResourceResponseDataBase {

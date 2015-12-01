@@ -22,16 +22,15 @@
 #ifndef SVGPathSegMovetoAbs_h
 #define SVGPathSegMovetoAbs_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegWithContext.h"
 
 namespace WebCore {
 
 class SVGPathSegMovetoAbs : public SVGPathSegSingleCoordinate {
 public:
-    static PassRefPtr<SVGPathSegMovetoAbs> create(SVGPathElement* element, SVGPathSegRole role, float x, float y)
+    static Ref<SVGPathSegMovetoAbs> create(SVGPathElement* element, SVGPathSegRole role, float x, float y)
     {
-        return adoptRef(new SVGPathSegMovetoAbs(element, role, x, y));
+        return adoptRef(*new SVGPathSegMovetoAbs(element, role, x, y));
     }
 
 private:
@@ -40,11 +39,10 @@ private:
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_MOVETO_ABS; }
-    virtual String pathSegTypeAsLetter() const { return "M"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_MOVETO_ABS; }
+    virtual String pathSegTypeAsLetter() const override { return "M"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

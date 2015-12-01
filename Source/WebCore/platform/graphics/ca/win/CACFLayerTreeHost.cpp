@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,19 +26,22 @@
 #include "config.h"
 #include "CACFLayerTreeHost.h"
 
-#if USE(ACCELERATED_COMPOSITING)
-
 #include "CACFLayerTreeHostClient.h"
+#include "DebugPageOverlays.h"
 #include "DefWndProcWindowClass.h"
+#include "FrameView.h"
 #include "LayerChangesFlusher.h"
-#include "LegacyCACFLayerTreeHost.h"
-#include "PlatformCALayer.h"
+#include "MainFrame.h"
+#include "PlatformCALayerWin.h"
+#include "PlatformLayer.h"
+#include "TiledBacking.h"
 #include "WKCACFViewLayerTreeHost.h"
 #include "WebCoreInstanceHandle.h"
 #include <limits.h>
 #include <QuartzCore/CABase.h>
 #include <wtf/CurrentTime.h>
-#include <wtf/OwnArrayPtr.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/win/GDIObject.h>
 
 #ifdef DEBUG_ALL
 #pragma comment(lib, "QuartzCore_debug")
@@ -112,23 +115,14 @@ bool CACFLayerTreeHost::acceleratedCompositingAvailable()
 PassRefPtr<CACFLayerTreeHost> CACFLayerTreeHost::create()
 {
     if (!acceleratedCompositingAvailable())
-        return 0;
+        return nullptr;
     RefPtr<CACFLayerTreeHost> host = WKCACFViewLayerTreeHost::create();
-    if (!host)
-        host = LegacyCACFLayerTreeHost::create();
     host->initialize();
     return host.release();
 }
 
 CACFLayerTreeHost::CACFLayerTreeHost()
-    : m_client(0)
-    , m_rootLayer(PlatformCALayer::create(PlatformCALayer::LayerTypeRootLayer, 0))
-    , m_window(0)
-    , m_shouldFlushPendingGraphicsLayerChanges(false)
-    , m_isFlushingLayerChanges(false)
-#if !ASSERT_DISABLED
-    , m_state(WindowNotSet)
-#endif
+    : m_rootLayer(PlatformCALayerWin::create(PlatformCALayer::LayerTypeRootLayer, nullptr))
 {
 }
 
@@ -191,6 +185,11 @@ void CACFLayerTreeHost::setWindow(HWND window)
     m_window = window;
 }
 
+void CACFLayerTreeHost::setPage(Page* page)
+{
+    m_page = page;
+}
+
 PlatformCALayer* CACFLayerTreeHost::rootLayer() const
 {
     return m_rootLayer.get();
@@ -206,7 +205,8 @@ void CACFLayerTreeHost::setRootChildLayer(PlatformCALayer* layer)
     m_rootLayer->removeAllSublayers();
     m_rootChildLayer = layer;
     if (m_rootChildLayer)
-        m_rootLayer->appendSublayer(m_rootChildLayer.get());
+        m_rootLayer->appendSublayer(*m_rootChildLayer);
+    updateDebugInfoLayer(m_page->settings().showTiledScrollingIndicator());
 }
    
 void CACFLayerTreeHost::layerTreeDidChange()
@@ -221,14 +221,14 @@ void CACFLayerTreeHost::layerTreeDidChange()
     // The layer tree is changing as a result of someone modifying a PlatformCALayer that doesn't
     // have a corresponding GraphicsLayer. Schedule a flush since we won't schedule one through the
     // normal GraphicsLayer mechanisms.
-    LayerChangesFlusher::shared().flushPendingLayerChangesSoon(this);
+    LayerChangesFlusher::singleton().flushPendingLayerChangesSoon(this);
 }
 
 void CACFLayerTreeHost::destroyRenderer()
 {
-    m_rootLayer = 0;
-    m_rootChildLayer = 0;
-    LayerChangesFlusher::shared().cancelPendingFlush(this);
+    m_rootLayer = nullptr;
+    m_rootChildLayer = nullptr;
+    LayerChangesFlusher::singleton().cancelPendingFlush(this);
 }
 
 static void getDirtyRects(HWND window, Vector<CGRect>& outRects)
@@ -239,7 +239,7 @@ static void getDirtyRects(HWND window, Vector<CGRect>& outRects)
     if (!GetClientRect(window, &clientRect))
         return;
 
-    OwnPtr<HRGN> region = adoptPtr(CreateRectRgn(0, 0, 0, 0));
+    auto region = adoptGDIObject(::CreateRectRgn(0, 0, 0, 0));
     int regionType = GetUpdateRgn(window, region.get(), false);
     if (regionType != COMPLEXREGION) {
         RECT dirtyRect;
@@ -248,10 +248,10 @@ static void getDirtyRects(HWND window, Vector<CGRect>& outRects)
         return;
     }
 
-    DWORD dataSize = GetRegionData(region.get(), 0, 0);
-    OwnArrayPtr<unsigned char> regionDataBuffer = adoptArrayPtr(new unsigned char[dataSize]);
+    DWORD dataSize = ::GetRegionData(region.get(), 0, 0);
+    auto regionDataBuffer = std::make_unique<unsigned char[]>(dataSize);
     RGNDATA* regionData = reinterpret_cast<RGNDATA*>(regionDataBuffer.get());
-    if (!GetRegionData(region.get(), dataSize, regionData))
+    if (!::GetRegionData(region.get(), dataSize, regionData))
         return;
 
     outRects.resize(regionData->rdh.nCount);
@@ -261,17 +261,17 @@ static void getDirtyRects(HWND window, Vector<CGRect>& outRects)
         outRects[i] = winRectToCGRect(*rect, clientRect);
 }
 
-void CACFLayerTreeHost::paint()
+void CACFLayerTreeHost::paint(HDC dc)
 {
     Vector<CGRect> dirtyRects;
     getDirtyRects(m_window, dirtyRects);
-    render(dirtyRects);
+    render(dirtyRects, dc);
 }
 
 void CACFLayerTreeHost::flushPendingGraphicsLayerChangesSoon()
 {
     m_shouldFlushPendingGraphicsLayerChanges = true;
-    LayerChangesFlusher::shared().flushPendingLayerChangesSoon(this);
+    LayerChangesFlusher::singleton().flushPendingLayerChangesSoon(this);
 }
 
 void CACFLayerTreeHost::setShouldInvertColors(bool)
@@ -282,6 +282,8 @@ void CACFLayerTreeHost::flushPendingLayerChangesNow()
 {
     // Calling out to the client could cause our last reference to go away.
     RefPtr<CACFLayerTreeHost> protector(this);
+
+    updateDebugInfoLayer(m_page->settings().showTiledScrollingIndicator());
 
     m_isFlushingLayerChanges = true;
 
@@ -309,11 +311,11 @@ void CACFLayerTreeHost::notifyAnimationsStarted()
     // Send currentTime to the pending animations. This function is called by CACF in a callback
     // which occurs after the drawInContext calls. So currentTime is very close to the time
     // the animations actually start
-    double currentTime = WTF::currentTime();
+    double currentTime = monotonicallyIncreasingTime();
 
     HashSet<RefPtr<PlatformCALayer> >::iterator end = m_pendingAnimatedLayers.end();
     for (HashSet<RefPtr<PlatformCALayer> >::iterator it = m_pendingAnimatedLayers.begin(); it != end; ++it)
-        (*it)->animationStarted(currentTime);
+        (*it)->animationStarted(String(), currentTime);
 
     m_pendingAnimatedLayers.clear();
 }
@@ -326,6 +328,44 @@ CGRect CACFLayerTreeHost::bounds() const
     return winRectToCGRect(clientRect);
 }
 
+String CACFLayerTreeHost::layerTreeAsString() const
+{
+    if (!m_rootLayer)
+        return emptyString();
+
+    return m_rootLayer->layerTreeAsString();
 }
 
-#endif // USE(ACCELERATED_COMPOSITING)
+TiledBacking* CACFLayerTreeHost::mainFrameTiledBacking() const
+{
+    if (!m_page)
+        return nullptr;
+
+    FrameView* frameView = m_page->mainFrame().view();
+    if (!frameView)
+        return nullptr;
+    
+    return frameView->tiledBacking();
+}
+
+void CACFLayerTreeHost::updateDebugInfoLayer(bool showLayer)
+{
+    if (showLayer) {
+        if (!m_debugInfoLayer) {
+            if (TiledBacking* tiledBacking = mainFrameTiledBacking())
+                m_debugInfoLayer = tiledBacking->tiledScrollingIndicatorLayer();
+        }
+
+        if (m_debugInfoLayer) {
+#ifndef NDEBUG
+            m_debugInfoLayer->setName("Debug Info");
+#endif
+            m_rootLayer->appendSublayer(*m_debugInfoLayer);
+        }
+    } else if (m_debugInfoLayer) {
+        m_debugInfoLayer->removeFromSuperlayer();
+        m_debugInfoLayer = nullptr;
+    }
+}
+
+}

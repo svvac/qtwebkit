@@ -102,4 +102,9 @@ void screenColorProfile(ColorProfile&)
     notImplemented();
 }
 
+bool screenHasInvertedColors()
+{
+    return false;
+}
+
 } // namespace WebCore

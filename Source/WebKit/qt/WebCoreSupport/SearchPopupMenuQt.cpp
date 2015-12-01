@@ -33,11 +33,11 @@ PopupMenu* SearchPopupMenuQt::popupMenu()
     return m_popup.get();
 }
 
-void SearchPopupMenuQt::saveRecentSearches(const AtomicString&, const Vector<String>&)
+void SearchPopupMenuQt::saveRecentSearches(const AtomicString&, const Vector<RecentSearch>&)
 {
 }
 
-void SearchPopupMenuQt::loadRecentSearches(const AtomicString&, Vector<String>&)
+void SearchPopupMenuQt::loadRecentSearches(const AtomicString&, Vector<RecentSearch>&)
 {
 }
 

@@ -26,7 +26,7 @@
 #ifndef ScrollbarThemeQStyle_h
 #define ScrollbarThemeQStyle_h
 
-#include "ScrollbarTheme.h"
+#include "ScrollbarThemeComposite.h"
 
 #include <QtCore/qglobal.h>
 
@@ -34,31 +34,25 @@ namespace WebCore {
 
 class QStyleFacade;
 
-class ScrollbarThemeQStyle : public ScrollbarTheme {
+class ScrollbarThemeQStyle : public ScrollbarThemeComposite {
 public:
     ScrollbarThemeQStyle();
     virtual ~ScrollbarThemeQStyle();
 
-    virtual bool paint(ScrollbarThemeClient*, GraphicsContext*, const IntRect& dirtyRect);
+    virtual bool paint(Scrollbar&, GraphicsContext&, const IntRect& damageRect);
     virtual void paintScrollCorner(ScrollView*, GraphicsContext*, const IntRect& cornerRect);
 
-    virtual ScrollbarPart hitTest(ScrollbarThemeClient*, const IntPoint&);
+    virtual bool hasButtons(Scrollbar&) { return false; }
+    virtual bool hasThumb(Scrollbar&) { return false; }
 
-    virtual bool shouldCenterOnThumb(ScrollbarThemeClient*, const PlatformMouseEvent&);
-
-    virtual void invalidatePart(ScrollbarThemeClient*, ScrollbarPart);
-
-    virtual int thumbPosition(ScrollbarThemeClient*);
-    virtual int thumbLength(ScrollbarThemeClient*);
-    virtual int trackPosition(ScrollbarThemeClient*);
-    virtual int trackLength(ScrollbarThemeClient*);
-
-    virtual int scrollbarThickness(ScrollbarControlSize = RegularScrollbar);
+    virtual IntRect backButtonRect(Scrollbar&, ScrollbarPart, bool painting = false);
+    virtual IntRect forwardButtonRect(Scrollbar&, ScrollbarPart, bool painting = false);
+    virtual IntRect trackRect(Scrollbar&, bool painting = false);
 
     QStyleFacade* qStyle() { return m_qStyle.get(); }
 
 private:
-    OwnPtr<QStyleFacade> m_qStyle;
+    std::unique_ptr<QStyleFacade> m_qStyle;
 };
 
 }

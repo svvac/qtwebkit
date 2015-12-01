@@ -21,8 +21,6 @@
 #include "config.h"
 #include "GraphicsContext3D.h"
 
-#if USE(3D_GRAPHICS) || USE(ACCELERATED_COMPOSITING)
-
 #include "GLDefs.h"
 #include "GraphicsContext3DPrivate.h"
 #include "Image.h"
@@ -175,21 +173,20 @@ Platform3DObject GraphicsContext3D::platformTexture() const
     return m_texture;
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 PlatformLayer* GraphicsContext3D::platformLayer() const
 {
-#if USE(TEXTURE_MAPPER_GL)
     return m_private.get();
-#else
-    notImplemented();
-    return 0;
-#endif
 }
-#endif
 
 bool GraphicsContext3D::makeContextCurrent()
 {
+    if (!m_private)
+        return false;
     return m_private->makeContextCurrent();
+}
+
+void GraphicsContext3D::checkGPUStatusIfNecessary()
+{
 }
 
 bool GraphicsContext3D::isGLES2Compliant() const
@@ -201,12 +198,12 @@ bool GraphicsContext3D::isGLES2Compliant() const
 #endif
 }
 
-void GraphicsContext3D::setContextLostCallback(PassOwnPtr<ContextLostCallback> callBack)
+void GraphicsContext3D::setContextLostCallback(std::unique_ptr<ContextLostCallback> callBack)
 {
-    m_private->setContextLostCallback(callBack);
+    m_private->setContextLostCallback(WTF::move(callBack));
 }
 
-void GraphicsContext3D::setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>) 
+void GraphicsContext3D::setErrorMessageCallback(std::unique_ptr<ErrorMessageCallback>)
 {
     notImplemented();
 }
@@ -234,12 +231,10 @@ void GraphicsContext3D::paintToCanvas(const unsigned char* imagePixels, int imag
     context->restore();
 }
 
-#if USE(GRAPHICS_SURFACE)
 void GraphicsContext3D::createGraphicsSurfaces(const IntSize& size)
 {
     m_private->didResizeCanvas(size);
 }
-#endif
 
 GraphicsContext3D::ImageExtractor::~ImageExtractor()
 {
@@ -265,12 +260,10 @@ bool GraphicsContext3D::ImageExtractor::extractImage(bool premultiplyAlpha, bool
     if (m_image->data()) {
         decoder.setData(m_image->data(), true);
 
-        if (!decoder.frameCount())
+        if (!decoder.frameCount() || !decoder.frameIsCompleteAtIndex(0))
             return false;
 
         m_imageSurface = decoder.createFrameAtIndex(0);
-        if (!m_imageSurface || !decoder.frameIsCompleteAtIndex(0))
-            return false;
     } else {
         m_imageSurface = m_image->nativeImageForCurrentFrame();
         // 1. For texImage2D with HTMLVideoElment input, assume no PremultiplyAlpha had been applied and the alpha value is 0xFF for each pixel,
@@ -312,5 +305,3 @@ bool GraphicsContext3D::ImageExtractor::extractImage(bool premultiplyAlpha, bool
 }
 
 } // namespace WebCore
-
-#endif // USE(3D_GRAPHICS)

@@ -26,7 +26,7 @@
 #ifndef ScrollingTreeStickyNode_h
 #define ScrollingTreeStickyNode_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
 
 #include "ScrollingConstraints.h"
 #include "ScrollingTreeNode.h"
@@ -40,15 +40,15 @@ class StickyPositionViewportConstraints;
 
 class ScrollingTreeStickyNode : public ScrollingTreeNode {
 public:
-    static PassOwnPtr<ScrollingTreeStickyNode> create(ScrollingTree*, ScrollingNodeID);
+    WEBCORE_EXPORT static Ref<ScrollingTreeStickyNode> create(ScrollingTree&, ScrollingNodeID);
 
     virtual ~ScrollingTreeStickyNode();
 
 private:
-    ScrollingTreeStickyNode(ScrollingTree*, ScrollingNodeID);
+    ScrollingTreeStickyNode(ScrollingTree&, ScrollingNodeID);
 
-    virtual void updateBeforeChildren(ScrollingStateNode*) OVERRIDE;
-    virtual void parentScrollPositionDidChange(const IntRect& viewportRect, const FloatSize& cumulativeDelta) OVERRIDE;
+    virtual void updateBeforeChildren(const ScrollingStateNode&) override;
+    virtual void updateLayersAfterAncestorChange(const ScrollingTreeNode& changedNode, const FloatRect& fixedPositionRect, const FloatSize& cumulativeDelta) override;
 
     StickyPositionViewportConstraints m_constraints;
     RetainPtr<CALayer> m_layer;
@@ -56,6 +56,8 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+SPECIALIZE_TYPE_TRAITS_SCROLLING_NODE(ScrollingTreeStickyNode, isStickyNode())
+
+#endif // ENABLE(ASYNC_SCROLLING)
 
 #endif // ScrollingTreeStickyNode_h

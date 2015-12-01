@@ -31,9 +31,6 @@
 #ifndef InspectorWorkerResource_h
 #define InspectorWorkerResource_h
 
-#if ENABLE(WORKERS) && ENABLE(INSPECTOR)
-
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
@@ -42,9 +39,9 @@ namespace WebCore {
 
 class InspectorWorkerResource : public RefCounted<InspectorWorkerResource> {
 public:
-    static PassRefPtr<InspectorWorkerResource> create(intptr_t id, const String& url, bool isSharedWorker)
+    static Ref<InspectorWorkerResource> create(intptr_t id, const String& url, bool isSharedWorker)
     {
-        return adoptRef(new InspectorWorkerResource(id, url, isSharedWorker));
+        return adoptRef(*new InspectorWorkerResource(id, url, isSharedWorker));
     }
 
     intptr_t id() const { return m_id; }
@@ -64,7 +61,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS) && ENABLE(INSPECTOR)
 
 #endif // InspectorWorkerResource_h

@@ -34,7 +34,8 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "InspectorController.h"
-#include "InspectorFrontend.h"
+#include "InspectorFrontendChannel.h"
+#include "InspectorFrontendClient.h"
 #include "InspectorServerQt.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -160,9 +161,9 @@ void InspectorClientQt::inspectorDestroyed()
 }
 
     
-WebCore::InspectorFrontendChannel* InspectorClientQt::openInspectorFrontend(WebCore::InspectorController* inspectorController)
+WebCore::InspectorFrontendClient* InspectorClientQt::openInspectorFrontend(WebCore::InspectorController* inspectorController)
 {
-    WebCore::InspectorFrontendChannel* frontendChannel = 0;
+    WebCore::InspectorFrontendClient* frontendChannel = 0;
 #if ENABLE(INSPECTOR)
     QObject* view = 0;
     QWebPageAdapter* inspectorPage = 0;
@@ -195,7 +196,7 @@ WebCore::InspectorFrontendChannel* InspectorClientQt::openInspectorFrontend(WebC
 
     // Is 'controller' the same object as 'inspectorController' (which appears to be unused)?
     InspectorController* controller = inspectorPage->page->inspectorController();
-    OwnPtr<InspectorFrontendClientQt> frontendClient = adoptPtr(new InspectorFrontendClientQt(m_inspectedWebPage, inspectorView.release(), inspectorPage->page, this));
+    std::unique_ptr<InspectorFrontendClientQt> frontendClient = std::make_unique<InspectorFrontendClientQt>(m_inspectedWebPage, inspectorView.release(), inspectorPage->page, this);
     m_frontendClient = frontendClient.get();
     controller->setInspectorFrontendClient(frontendClient.release());
     m_frontendWebPage = inspectorPage;
@@ -232,7 +233,7 @@ void InspectorClientQt::attachAndReplaceRemoteFrontend(InspectorServerRequestHan
 {
 #if ENABLE(INSPECTOR)
     m_remoteFrontEndChannel = channel;
-    m_inspectedWebPage->page->inspectorController()->connectFrontend(this);
+    m_inspectedWebPage->page->inspectorController().connectFrontend(this);
 #endif
 }
 
@@ -240,7 +241,7 @@ void InspectorClientQt::detachRemoteFrontend()
 {
 #if ENABLE(INSPECTOR)
     m_remoteFrontEndChannel = 0;
-    m_inspectedWebPage->page->inspectorController()->disconnectFrontend();
+    m_inspectedWebPage->page->inspectorController().disconnectFrontend();
 #endif
 }
 
@@ -278,7 +279,7 @@ bool InspectorClientQt::sendMessageToFrontend(const String& message)
 }
 
 #if ENABLE(INSPECTOR)
-InspectorFrontendClientQt::InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, PassOwnPtr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt* inspectorClient)
+InspectorFrontendClientQt::InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, std::unique_ptr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt* inspectorClient)
     : InspectorFrontendClientLocal(inspectedWebPage->page->inspectorController(), inspectorPage, adoptPtr(new InspectorFrontendSettingsQt()))
     , m_inspectedWebPage(inspectedWebPage)
     , m_inspectorView(inspectorView)
@@ -373,7 +374,7 @@ void InspectorFrontendClientQt::destroyInspectorView(bool notifyInspectorControl
         m_inspectorClient->releaseFrontendPage();
 
     // Clear pointer before deleting WebView to avoid recursive calls to its destructor.
-    OwnPtr<QObject> inspectorView = m_inspectorView.release();
+    m_inspectorView.reset();
 }
 
 void InspectorFrontendClientQt::inspectorClientDestroyed()

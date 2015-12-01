@@ -37,8 +37,6 @@
 #include <QObject>
 #include <QString>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 class QWebPageAdapter;
 class QWebPage;
@@ -49,13 +47,13 @@ class InspectorFrontendClientQt;
 class InspectorServerRequestHandlerQt;
 class Page;
 
-class InspectorClientQt : public InspectorClient, public InspectorFrontendChannel {
+class InspectorClientQt : public InspectorClient, public InspectorFrontendClient {
 public:
     explicit InspectorClientQt(QWebPageAdapter*);
 
     virtual void inspectorDestroyed();
 
-    virtual WebCore::InspectorFrontendChannel* openInspectorFrontend(WebCore::InspectorController*);
+    virtual WebCore::InspectorFrontendClient* openInspectorFrontend(WebCore::InspectorController*);
     virtual void closeInspectorFrontend();
     virtual void bringFrontendToFront();
 
@@ -81,7 +79,7 @@ private:
 
 class InspectorFrontendClientQt : public InspectorFrontendClientLocal {
 public:
-    InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, PassOwnPtr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt*);
+    InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, std::unique_ptr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt*);
     virtual ~InspectorFrontendClientQt();
 
     virtual void frontendLoaded();
@@ -96,7 +94,7 @@ public:
 
     virtual void setAttachedWindowHeight(unsigned);
     virtual void setAttachedWindowWidth(unsigned);
-    virtual void setToolbarHeight(unsigned) OVERRIDE;
+    virtual void setToolbarHeight(unsigned) override;
 
     virtual void inspectedURLChanged(const String& newURL);
 
@@ -106,7 +104,7 @@ private:
     void updateWindowTitle();
     void destroyInspectorView(bool notifyInspectorController);
     QWebPageAdapter* m_inspectedWebPage;
-    OwnPtr<QObject> m_inspectorView;
+    std::unique_ptr<QObject> m_inspectorView;
     QString m_inspectedURL;
     bool m_destroyingInspectorView;
     InspectorClientQt* m_inspectorClient;

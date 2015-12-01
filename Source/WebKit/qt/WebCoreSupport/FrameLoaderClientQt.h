@@ -35,14 +35,12 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLFormElement.h"
-#include "KURL.h"
+#include "URL.h"
 #include "ResourceError.h"
 #include "ResourceResponse.h"
-#include "WebCore/plugins/PluginView.h"
 #include <QUrl>
 #include <qobject.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
 QT_BEGIN_NAMESPACE
@@ -109,8 +107,7 @@ public:
     virtual void dispatchDidHandleOnloadEvents();
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad();
     virtual void dispatchDidCancelClientRedirect();
-    virtual void dispatchWillPerformClientRedirect(const KURL&, double interval, double fireDate);
-    virtual void dispatchDidNavigateWithinPage() OVERRIDE;
+    virtual void dispatchWillPerformClientRedirect(const URL&, double interval, double fireDate);
     virtual void dispatchDidChangeLocationWithinPage();
     virtual void dispatchDidPushStateWithinPage();
     virtual void dispatchDidReplaceStateWithinPage();
@@ -130,15 +127,18 @@ public:
     virtual WebCore::Frame* dispatchCreatePage(const WebCore::NavigationAction&);
     virtual void dispatchShow();
 
-    virtual void dispatchDecidePolicyForResponse(FramePolicyFunction, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&);
-    virtual void dispatchDecidePolicyForNewWindowAction(FramePolicyFunction, const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>, const WTF::String&);
-    virtual void dispatchDecidePolicyForNavigationAction(FramePolicyFunction, const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>);
+    virtual void dispatchDecidePolicyForResponse(const ResourceResponse&, const ResourceRequest&, FramePolicyFunction);
+    virtual void dispatchDecidePolicyForNewWindowAction(const NavigationAction&, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, FramePolicyFunction);
+    virtual void dispatchDecidePolicyForNavigationAction(const NavigationAction&, const ResourceRequest&, PassRefPtr<FormState>, FramePolicyFunction);
     virtual void cancelPolicyCheck();
 
     virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&);
 
-    virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) { }
-    virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>);
+    virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) {}
+    virtual void dispatchWillSubmitForm(PassRefPtr<FormState>, FramePolicyFunction) {}
+
+    virtual void willReplaceMultipartContent() {}
+    virtual void didReplaceMultipartContent() {}
 
     virtual void revertToProvisionalState(DocumentLoader*) { }
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&);
@@ -162,11 +162,12 @@ public:
     virtual bool shouldGoToHistoryItem(HistoryItem*) const;
     virtual bool shouldStopLoadingForHistoryItem(HistoryItem*) const;
     virtual void didDisplayInsecureContent();
-    virtual void didRunInsecureContent(SecurityOrigin*, const KURL&);
-    virtual void didDetectXSS(const KURL&, bool didBlockEntirePage);
+    virtual void didRunInsecureContent(SecurityOrigin*, const URL&);
+    virtual void didDetectXSS(const URL&, bool didBlockEntirePage);
 
     virtual ResourceError cancelledError(const ResourceRequest&);
     virtual ResourceError blockedError(const ResourceRequest&);
+    virtual ResourceError blockedByContentBlockerError(const ResourceRequest&);
     virtual ResourceError cannotShowURLError(const ResourceRequest&);
     virtual ResourceError interruptedForPolicyChangeError(const ResourceRequest&);
 
@@ -177,7 +178,7 @@ public:
     virtual bool shouldFallBack(const ResourceError&);
 
     virtual bool canHandleRequest(const WebCore::ResourceRequest&) const;
-    virtual bool canShowMIMEType(const String& MIMEType) const;
+    virtual bool canShowMIMEType(const String& mimeTypeFromEType) const;
     virtual bool canShowMIMETypeAsHTML(const String& MIMEType) const;
     virtual bool representationExistsForURLScheme(const String& URLScheme) const;
     virtual String generatedMIMETypeForURLScheme(const String& URLScheme) const;
@@ -189,10 +190,11 @@ public:
     virtual void didFinishLoad();
     virtual void prepareForDataSourceReplacement();
 
-    virtual WTF::PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
-    virtual void setTitle(const StringWithDirection&, const KURL&);
+    virtual WTF::Ref<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
+    virtual void updateCachedDocumentLoader(DocumentLoader&) { }
+    virtual void setTitle(const StringWithDirection&, const URL&);
 
-    virtual String userAgent(const WebCore::KURL&);
+    virtual String userAgent(const WebCore::URL&);
 
     virtual void savePlatformDataToCachedFrame(WebCore::CachedFrame*);
     virtual void transitionToCommittedFromCachedFrame(WebCore::CachedFrame*);
@@ -206,27 +208,29 @@ public:
     virtual bool canCachePage() const;
     virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
 
-    virtual PassRefPtr<Frame> createFrame(const KURL&, const String& name, HTMLFrameOwnerElement*, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight);
-    virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool);
+    virtual RefPtr<Frame> createFrame(const URL&, const String& name, HTMLFrameOwnerElement*, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight);
+    virtual RefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool);
     virtual void recreatePlugin(Widget*) { }
     virtual void redirectDataToPlugin(Widget* pluginWidget);
 
-    virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues);
+    virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues);
 
-    virtual ObjectContentType objectContentType(const KURL&, const String& mimeTypeIn, bool shouldPreferPlugInsForImages);
+    virtual ObjectContentType objectContentType(const URL&, const String& mimeType);
     virtual String overrideMediaType() const;
 
-    virtual void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*);
+    virtual void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld&);
     virtual void documentElementAvailable();
     virtual void didPerformFirstNavigation() const;
 
     virtual void registerForIconNotification(bool);
 
+    virtual void prefetchDNS(const String&) { }
+
     QString chooseFile(const QString& oldFile);
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext();
 
-    const KURL& lastRequestedUrl() const { return m_lastRequestedUrl; }
+    const URL& lastRequestedUrl() const { return m_lastRequestedUrl; }
 
     QWebFrameAdapter* webFrame() const;
 
@@ -257,11 +261,7 @@ private:
     QWebFrameAdapter *m_webFrame;
     ResourceResponse m_response;
 
-    // Plugin view to redirect data to
-    WebCore::PluginView* m_pluginView;
-    bool m_hasSentResponseToPlugin;
-
-    KURL m_lastRequestedUrl;
+    URL m_lastRequestedUrl;
     bool m_isOriginatingLoad;
 };
 

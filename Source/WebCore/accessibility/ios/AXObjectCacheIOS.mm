@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,15 +32,14 @@
 #import "WebAccessibilityObjectWrapperIOS.h"
 #import "RenderObject.h"
 
-#import <wtf/PassRefPtr.h>
 #import <wtf/RetainPtr.h>
 
 namespace WebCore {
     
-void AXObjectCache::detachWrapper(AccessibilityObject* obj)
+void AXObjectCache::detachWrapper(AccessibilityObject* obj, AccessibilityDetachmentType)
 {
     [obj->wrapper() detach];
-    obj->setWrapper(0);
+    obj->setWrapper(nullptr);
 }
 
 void AXObjectCache::attachWrapper(AccessibilityObject* obj)
@@ -70,6 +69,9 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* obj, AXNotific
         case AXLiveRegionChanged:
             [obj->wrapper() postLiveRegionChangeNotification];
             break;
+        case AXLiveRegionCreated:
+            [obj->wrapper() postLiveRegionCreatedNotification];
+            break;
         case AXChildrenChanged:
             [obj->wrapper() postChildrenChangedNotification];
             break;
@@ -79,28 +81,50 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* obj, AXNotific
         case AXInvalidStatusChanged:
             [obj->wrapper() postInvalidStatusChangedNotification];
             break;
-        case AXSelectedChildrenChanged:
         case AXValueChanged:
+            [obj->wrapper() postValueChangedNotification];
+            break;
+        case AXExpandedChanged:
+            [obj->wrapper() postExpandedChangedNotification];
+            break;
+        case AXSelectedChildrenChanged:
         case AXCheckedStateChanged:
         default:
             break;
     }
     
     // Used by DRT to know when notifications are posted.
-    [obj->wrapper() accessibilityPostedNotification:notificationString];
+    if (notificationString)
+        [obj->wrapper() accessibilityPostedNotification:notificationString];
 }
 
-void AXObjectCache::nodeTextChangePlatformNotification(AccessibilityObject*, AXTextChange, unsigned, const String&)
+void AXObjectCache::postTextStateChangePlatformNotification(AccessibilityObject* object, const AXTextStateChangeIntent&, const VisibleSelection&)
 {
+    postPlatformNotification(object, AXSelectedTextChanged);
 }
 
-void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject*, AXLoadingEvent)
+void AXObjectCache::postTextStateChangePlatformNotification(AccessibilityObject* object, AXTextEditType, const String&, const VisiblePosition&)
 {
+    postPlatformNotification(object, AXValueChanged);
 }
 
-void AXObjectCache::handleFocusedUIElementChanged(Node*, Node* newNode)
+void AXObjectCache::postTextReplacementPlatformNotification(AccessibilityObject* object, AXTextEditType, const String&, AXTextEditType, const String&, const VisiblePosition&)
 {
-    postNotification(newNode, AXFocusedUIElementChanged, true, PostAsynchronously);
+    postPlatformNotification(object, AXValueChanged);
+}
+
+void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject* axFrameObject, AXLoadingEvent loadingEvent)
+{
+    if (!axFrameObject)
+        return;
+    
+    if (loadingEvent == AXLoadingFinished && axFrameObject->document() == axFrameObject->topDocument())
+        postPlatformNotification(axFrameObject, AXLoadComplete);
+}
+
+void AXObjectCache::platformHandleFocusedUIElementChanged(Node*, Node* newNode)
+{
+    postNotification(newNode, AXFocusedUIElementChanged, TargetElement, PostAsynchronously);
 }
 
 void AXObjectCache::handleScrolledToAnchor(const Node*)

@@ -31,45 +31,43 @@
 #ifndef WorkerScriptDebugServer_h
 #define WorkerScriptDebugServer_h
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(WORKERS)
-
-#include "ScriptDebugServer.h"
+#include <inspector/ScriptDebugServer.h>
 
 namespace WebCore {
 
 class WorkerGlobalScope;
 
-class WorkerScriptDebugServer : public ScriptDebugServer {
+class WorkerScriptDebugServer final : public Inspector::ScriptDebugServer {
     WTF_MAKE_NONCOPYABLE(WorkerScriptDebugServer);
 public:
-    WorkerScriptDebugServer(WorkerGlobalScope*, const String&);
+    WorkerScriptDebugServer(WorkerGlobalScope&, const String&);
     ~WorkerScriptDebugServer() { }
 
-    void addListener(ScriptDebugListener*);
-    void removeListener(ScriptDebugListener*);
+    class Task {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        virtual ~Task() { }
+        virtual void run() = 0;
+    };
 
-    void interruptAndRunTask(PassOwnPtr<ScriptDebugServer::Task>);
+    virtual void recompileAllJSFunctions() override;
 
-    void recompileAllJSFunctions(Timer<ScriptDebugServer>*);
+    void interruptAndRunTask(std::unique_ptr<Task>);
 
 private:
-    virtual ListenerSet* getListenersForGlobalObject(JSC::JSGlobalObject*) { return &m_listeners; }
-    virtual void didPause(JSC::JSGlobalObject*) { }
-    virtual void didContinue(JSC::JSGlobalObject*) { }
+    virtual void attachDebugger() override;
+    virtual void detachDebugger(bool isBeingDestroyed) override;
 
-    virtual bool isContentScript(JSC::ExecState*) { return false; }
+    virtual void didPause(JSC::JSGlobalObject*) override { }
+    virtual void didContinue(JSC::JSGlobalObject*) override { }
+    virtual void runEventLoopWhilePaused() override;
+    virtual bool isContentScript(JSC::ExecState*) const override { return false; }
+    virtual void reportException(JSC::ExecState*, JSC::Exception*) const override;
 
-    virtual void willExecuteProgram(const JSC::DebuggerCallFrame&, intptr_t sourceID, int lineno, int columnNumber);
-
-    virtual void runEventLoopWhilePaused();
-
-    WorkerGlobalScope* m_workerGlobalScope;
-    ListenerSet m_listeners;
+    WorkerGlobalScope& m_workerGlobalScope;
     String m_debuggerTaskMode;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(WORKERS)
 
 #endif // WorkerScriptDebugServer_h

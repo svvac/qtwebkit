@@ -25,18 +25,18 @@
 #define Event_h
 
 #include "DOMTimeStamp.h"
-#include "EventNames.h"
+#include "EventInterfaces.h"
 #include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
+#include <wtf/TypeCasts.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
-class Clipboard;
+class DataTransfer;
 class EventTarget;
-class EventDispatcher;
 class HTMLIFrameElement;
 
 struct EventInit {
@@ -45,6 +45,14 @@ struct EventInit {
 
     bool bubbles;
     bool cancelable;
+};
+
+enum EventInterface {
+
+#define DOM_EVENT_INTERFACE_DECLARE(name) name##InterfaceType,
+DOM_EVENT_INTERFACES_FOR_EACH(DOM_EVENT_INTERFACE_DECLARE)
+#undef DOM_EVENT_INTERFACE_DECLARE
+
 };
 
 class Event : public ScriptWrappable, public RefCounted<Event> {
@@ -75,23 +83,24 @@ public:
         CHANGE              = 32768
     };
 
-    static PassRefPtr<Event> create()
+    static Ref<Event> create()
     {
-        return adoptRef(new Event);
+        return adoptRef(*new Event);
     }
-    static PassRefPtr<Event> create(const AtomicString& type, bool canBubble, bool cancelable)
+    static Ref<Event> create(const AtomicString& type, bool canBubble, bool cancelable)
     {
-        return adoptRef(new Event(type, canBubble, cancelable));
+        return adoptRef(*new Event(type, canBubble, cancelable));
     }
 
-    static PassRefPtr<Event> create(const AtomicString& type, const EventInit& initializer)
+    static Ref<Event> create(const AtomicString& type, const EventInit& initializer)
     {
-        return adoptRef(new Event(type, initializer));
+        return adoptRef(*new Event(type, initializer));
     }
 
     virtual ~Event();
 
     void initEvent(const AtomicString& type, bool canBubble, bool cancelable);
+    bool isInitialized() const { return m_isInitialized; }
 
     const AtomicString& type() const { return m_type; }
     void setType(const AtomicString& type) { m_type = type; }
@@ -115,13 +124,12 @@ public:
     // IE Extensions
     EventTarget* srcElement() const { return target(); } // MSIE extension - "the object that fired the event"
 
-    bool returnValue() const { return !defaultPrevented(); }
-    void setReturnValue(bool returnValue) { setDefaultPrevented(!returnValue); }
+    bool legacyReturnValue() const { return !defaultPrevented(); }
+    void setLegacyReturnValue(bool returnValue) { setDefaultPrevented(!returnValue); }
 
-    Clipboard* clipboardData() const { return isClipboardEvent() ? clipboard() : 0; }
+    DataTransfer* clipboardData() const { return isClipboardEvent() ? internalDataTransfer() : nullptr; }
 
-    virtual const AtomicString& interfaceName() const;
-    bool hasInterface(const AtomicString&) const;
+    virtual EventInterface eventInterface() const;
 
     // These events are general classes of events.
     virtual bool isUIEvent() const;
@@ -136,6 +144,12 @@ public:
     // These events lack a DOM interface.
     virtual bool isClipboardEvent() const;
     virtual bool isBeforeTextInsertedEvent() const;
+
+    virtual bool isBeforeUnloadEvent() const;
+
+    virtual bool isErrorEvent() const;
+    virtual bool isTextEvent() const;
+    virtual bool isWheelEvent() const;
 
     bool propagationStopped() const { return m_propagationStopped || m_immediatePropagationStopped; }
     bool immediatePropagationStopped() const { return m_immediatePropagationStopped; }
@@ -157,18 +171,17 @@ public:
     Event* underlyingEvent() const { return m_underlyingEvent.get(); }
     void setUnderlyingEvent(PassRefPtr<Event>);
 
-    virtual bool storesResultAsString() const;
-    virtual void storeResult(const String&);
-
-    virtual Clipboard* clipboard() const { return 0; }
+    virtual DataTransfer* internalDataTransfer() const { return 0; }
 
     bool isBeingDispatched() const { return eventPhase(); }
 
     virtual PassRefPtr<Event> cloneFor(HTMLIFrameElement*) const;
 
+    virtual EventTarget* relatedTarget() const { return nullptr; }
+
 protected:
     Event();
-    Event(const AtomicString& type, bool canBubble, bool cancelable);
+    WEBCORE_EXPORT Event(const AtomicString& type, bool canBubble, bool cancelable);
     Event(const AtomicString& type, bool canBubble, bool cancelable, double timestamp);
     Event(const AtomicString& type, const EventInit&);
 
@@ -176,18 +189,19 @@ protected:
     bool dispatched() const { return m_target; }
 
 private:
+    bool m_isInitialized { false };
     AtomicString m_type;
-    bool m_canBubble;
-    bool m_cancelable;
+    bool m_canBubble { false };
+    bool m_cancelable { false };
 
-    bool m_propagationStopped;
-    bool m_immediatePropagationStopped;
-    bool m_defaultPrevented;
-    bool m_defaultHandled;
-    bool m_cancelBubble;
+    bool m_propagationStopped { false };
+    bool m_immediatePropagationStopped { false };
+    bool m_defaultPrevented { false };
+    bool m_defaultHandled { false };
+    bool m_cancelBubble { false };
 
-    unsigned short m_eventPhase;
-    EventTarget* m_currentTarget;
+    unsigned short m_eventPhase { 0 };
+    EventTarget* m_currentTarget { nullptr };
     RefPtr<EventTarget> m_target;
     DOMTimeStamp m_createTime;
 
@@ -195,5 +209,10 @@ private:
 };
 
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_EVENT(ToValueTypeName) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::Event& event) { return event.is##ToValueTypeName(); } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // Event_h

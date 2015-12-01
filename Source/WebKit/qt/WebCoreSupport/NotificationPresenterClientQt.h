@@ -69,7 +69,7 @@ public Q_SLOTS:
     void notificationClicked();
 
 private:
-    OwnPtr<QWebNotificationPresenter> m_presenter;
+    std::unique_ptr<QWebNotificationPresenter> m_presenter;
     Timer<NotificationWrapper> m_closeTimer;
     Timer<NotificationWrapper> m_displayEventTimer;
 

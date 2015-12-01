@@ -17,8 +17,10 @@
 #include "config.h"
 #include "PlatformCookieJar.h"
 
+#if USE(CURL)
+
 #include "Cookie.h"
-#include "KURL.h"
+#include "URL.h"
 #include "ResourceHandleManager.h"
 
 #include <wtf/DateMath.h>
@@ -33,12 +35,35 @@ static void readCurlCookieToken(const char*& cookie, String& token)
 {
     // Read the next token from a cookie with the Netscape cookie format.
     // Curl separates each token in line with tab character.
-    while (cookie && cookie[0] && cookie[0] != '\t') {
-        token.append(cookie[0]);
+    const char* cookieStart = cookie;
+    while (cookie && cookie[0] && cookie[0] != '\t')
         cookie++;
-    }
+    token = String(cookieStart, cookie - cookieStart);
     if (cookie[0] == '\t')
         cookie++;
+}
+
+static bool domainMatch(const String& cookieDomain, const String& host)
+{
+    size_t index = host.find(cookieDomain);
+
+    bool tailMatch = (index != WTF::notFound && index + cookieDomain.length() == host.length());
+
+    // Check if host equals cookie domain.
+    if (tailMatch && !index)
+        return true;
+
+    // Check if host is a subdomain of the domain in the cookie.
+    // Curl uses a '.' in front of domains to indicate it's valid on subdomains.
+    if (tailMatch && index > 0 && host[index] == '.')
+        return true;
+
+    // Check the special case where host equals the cookie domain, except for a leading '.' in the cookie domain.
+    // E.g. cookie domain is .apple.com and host is apple.com. 
+    if (cookieDomain[0] == '.' && cookieDomain.find(host) == 1)
+        return true;
+
+    return false;
 }
 
 static void addMatchingCurlCookie(const char* cookie, const String& domain, const String& path, StringBuilder& cookies, bool httponly)
@@ -78,18 +103,7 @@ static void addMatchingCurlCookie(const char* cookie, const String& domain, cons
             return;
     }
 
-
-    if (cookieDomain[0] == '.') {
-        // Check if domain is a subdomain of the domain in the cookie.
-        // Curl uses a '.' in front of domains to indicate its valid on subdomains.
-        cookieDomain.remove(0);
-        int lenDiff = domain.length() - cookieDomain.length();
-        int index = domain.find(cookieDomain);
-        if (index == lenDiff)
-            subDomain = true;
-    }
-
-    if (!subDomain && cookieDomain != domain)
+    if (!domainMatch(cookieDomain, domain))
         return;
 
     String strBoolean;
@@ -135,7 +149,7 @@ static void addMatchingCurlCookie(const char* cookie, const String& domain, cons
 
 }
 
-static String getNetscapeCookieFormat(const KURL& url, const String& value)
+static String getNetscapeCookieFormat(const URL& url, const String& value)
 {
     // Constructs a cookie string in Netscape Cookie file format.
 
@@ -219,7 +233,7 @@ static String getNetscapeCookieFormat(const KURL& url, const String& value)
     return cookieStr.toString();
 }
 
-void setCookiesFromDOM(const NetworkStorageSession&, const KURL&, const KURL& url, const String& value)
+void setCookiesFromDOM(const NetworkStorageSession&, const URL&, const URL& url, const String& value)
 {
     CURL* curl = curl_easy_init();
 
@@ -238,6 +252,9 @@ void setCookiesFromDOM(const NetworkStorageSession&, const KURL&, const KURL& ur
     // required behavior if the domain field is not explicity specified.
     String cookie = getNetscapeCookieFormat(url, value);
 
+    if (!cookie.is8Bit())
+        cookie = String::make8BitFrom16BitSource(cookie.characters16(), cookie.length());
+
     CString strCookie(reinterpret_cast<const char*>(cookie.characters8()), cookie.length());
 
     curl_easy_setopt(curl, CURLOPT_COOKIELIST, strCookie.data());
@@ -245,7 +262,7 @@ void setCookiesFromDOM(const NetworkStorageSession&, const KURL&, const KURL& ur
     curl_easy_cleanup(curl);
 }
 
-static String cookiesForSession(const NetworkStorageSession&, const KURL&, const KURL& url, bool httponly)
+static String cookiesForSession(const NetworkStorageSession&, const URL&, const URL& url, bool httponly)
 {
     String cookies;
     CURL* curl = curl_easy_init();
@@ -281,29 +298,29 @@ static String cookiesForSession(const NetworkStorageSession&, const KURL&, const
     return cookies;
 }
 
-String cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return cookiesForSession(session, firstParty, url, false);
 }
 
-String cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return cookiesForSession(session, firstParty, url, true);
 }
 
-bool cookiesEnabled(const NetworkStorageSession&, const KURL& /*firstParty*/, const KURL& /*url*/)
+bool cookiesEnabled(const NetworkStorageSession&, const URL& /*firstParty*/, const URL& /*url*/)
 {
     return true;
 }
 
-bool getRawCookies(const NetworkStorageSession&, const KURL& /*firstParty*/, const KURL& /*url*/, Vector<Cookie>& rawCookies)
+bool getRawCookies(const NetworkStorageSession&, const URL& /*firstParty*/, const URL& /*url*/, Vector<Cookie>& rawCookies)
 {
     // FIXME: Not yet implemented
     rawCookies.clear();
     return false; // return true when implemented
 }
 
-void deleteCookie(const NetworkStorageSession&, const KURL&, const String&)
+void deleteCookie(const NetworkStorageSession&, const URL&, const String&)
 {
     // FIXME: Not yet implemented
 }
@@ -323,4 +340,11 @@ void deleteAllCookies(const NetworkStorageSession&)
     // FIXME: Not yet implemented
 }
 
+void deleteAllCookiesModifiedSince(const NetworkStorageSession&, std::chrono::system_clock::time_point)
+{
+    // FIXME: Not yet implemented
 }
+
+}
+
+#endif

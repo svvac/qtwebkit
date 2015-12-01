@@ -21,12 +21,13 @@
 #include "qwebhistory.h"
 #include "qwebhistory_p.h"
 
-#include "BackForwardListImpl.h"
+#include "BackForwardList.h"
 #include "Frame.h"
 #include "IconDatabaseBase.h"
 #include "Image.h"
 #include "IntSize.h"
-#include "KURL.h"
+#include "NotImplemented.h"
+#include "URL.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include <QWebPageAdapter.h>
@@ -102,8 +103,7 @@ QWebHistoryItem::~QWebHistoryItem()
 */
 QUrl QWebHistoryItem::originalUrl() const
 {
-    if (d->item)
-        return d->item->originalURL();
+    notImplemented();
     return QUrl();
 }
 
@@ -115,8 +115,7 @@ QUrl QWebHistoryItem::originalUrl() const
 */
 QUrl QWebHistoryItem::url() const
 {
-    if (d->item)
-        return d->item->url();
+    notImplemented();
     return QUrl();
 }
 
@@ -128,8 +127,7 @@ QUrl QWebHistoryItem::url() const
 */
 QString QWebHistoryItem::title() const
 {
-    if (d->item)
-        return d->item->title();
+    notImplemented();
     return QString();
 }
 
@@ -142,8 +140,9 @@ QString QWebHistoryItem::title() const
 QDateTime QWebHistoryItem::lastVisited() const
 {
     //FIXME : this will be wrong unless we correctly set lastVisitedTime ourselves
-    if (d->item)
-        return QDateTime::fromTime_t((uint)d->item->lastVisitedTime());
+    notImplemented();
+    //if (d->item)
+    //    return QDateTime::fromTime_t((uint)d->item->lastVisitedTime());
     return QDateTime();
 }
 
@@ -155,9 +154,7 @@ QDateTime QWebHistoryItem::lastVisited() const
 */
 QIcon QWebHistoryItem::icon() const
 {
-    if (d->item)
-        return *WebCore::iconDatabase().synchronousNativeIconForPageURL(d->item->url(), WebCore::IntSize(16, 16));
-
+    notImplemented();
     return QIcon();
 }
 
@@ -169,8 +166,9 @@ QIcon QWebHistoryItem::icon() const
 */
 QVariant QWebHistoryItem::userData() const
 {
-    if (d->item)
-        return d->item->userData();
+    //if (d->item)
+        //return d->item->userData();
+    notImplemented();
     return QVariant();
 }
 
@@ -185,8 +183,7 @@ QVariant QWebHistoryItem::userData() const
 */
 void QWebHistoryItem::setUserData(const QVariant& userData)
 {
-    if (d->item)
-        d->item->setUserData(userData);
+    notImplemented();
 }
 
 /*!*
@@ -203,7 +200,9 @@ QWebHistoryItem::QWebHistoryItem(QWebHistoryItemPrivate *priv)
 */
 bool QWebHistoryItem::isValid() const
 {
-    return d->item;
+    notImplemented();
+    //return d->item;
+    return false;
 }
 
 /*!
@@ -257,27 +256,30 @@ QWebHistory::~QWebHistory()
 */
 void QWebHistory::clear()
 {
+    notImplemented();
+    /*
     //shortcut to private BackForwardListImpl
-    WebCore::BackForwardListImpl* lst = d->lst;
+    WebCore::BackForwardList* lst = d->lst;
 
     //clear visited links
-    WebCore::Page* page = static_cast<WebCore::BackForwardListImpl*>(lst)->page();
-    if (page && page->groupPtr())
-        page->groupPtr()->removeVisitedLinks();
+    WebCore::Page* page = static_cast<WebCore::BackForwardList*>(lst)->page();
+    //if (page && page->groupPtr())
+    //    page->groupPtr()->removeVisitedLinks();
 
     //if count() == 0 then just return
     if (!lst->entries().size())
         return;
 
-    RefPtr<WebCore::HistoryItem> current = lst->currentItem();
+    WebCore::HistoryItem* current = lst->currentItem();
     int capacity = lst->capacity();
     lst->setCapacity(0);
 
     lst->setCapacity(capacity);   //revert capacity
-    lst->addItem(current.get());  //insert old current item
-    lst->goToItem(current.get()); //and set it as current again
+    lst->addItem(current);  //insert old current item
+    lst->goToItem(current); //and set it as current again
 
     d->page()->updateNavigationActions();
+    */
 }
 
 /*!
@@ -287,6 +289,10 @@ void QWebHistory::clear()
 */
 QList<QWebHistoryItem> QWebHistory::items() const
 {
+    notImplemented();
+    QList<QWebHistoryItem> ret;
+    return ret;
+    /*
     const WebCore::HistoryItemVector &items = d->lst->entries();
 
     QList<QWebHistoryItem> ret;
@@ -295,6 +301,7 @@ QList<QWebHistoryItem> QWebHistory::items() const
         ret.append(QWebHistoryItem(priv));
     }
     return ret;
+    */
 }
 
 /*!
@@ -305,15 +312,20 @@ QList<QWebHistoryItem> QWebHistory::items() const
 */
 QList<QWebHistoryItem> QWebHistory::backItems(int maxItems) const
 {
+    notImplemented();
+    QList<QWebHistoryItem> ret;
+    return ret;
+    /*
     WebCore::HistoryItemVector items(maxItems);
     d->lst->backListWithLimit(maxItems, items);
 
     QList<QWebHistoryItem> ret;
     for (unsigned i = 0; i < items.size(); ++i) {
-        QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(items[i].get());
+        QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(items[i]);
         ret.append(QWebHistoryItem(priv));
     }
     return ret;
+    */
 }
 
 /*!
@@ -329,7 +341,7 @@ QList<QWebHistoryItem> QWebHistory::forwardItems(int maxItems) const
 
     QList<QWebHistoryItem> ret;
     for (unsigned i = 0; i < items.size(); ++i) {
-        QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(items[i].get());
+        QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(items[i]);
         ret.append(QWebHistoryItem(priv));
     }
     return ret;
@@ -364,10 +376,13 @@ bool QWebHistory::canGoForward() const
 */
 void QWebHistory::back()
 {
+    notImplemented();
+    /*
     if (canGoBack()) {
-        WebCore::Page* page = static_cast<WebCore::BackForwardListImpl*>(d->lst)->page();
-        page->goToItem(d->lst->backItem(), WebCore::FrameLoadTypeIndexedBackForward);
+        WebCore::Page* page = static_cast<WebCore::BackForwardList*>(d->lst)->page();
+        page->goToItem(d->lst->backItem(), WebCore::FrameLoadType::IndexedBackForward);
     }
+    */
 }
 
 /*!
@@ -378,10 +393,13 @@ void QWebHistory::back()
 */
 void QWebHistory::forward()
 {
+    notImplemented();
+    /*
     if (canGoForward()) {
-        WebCore::Page* page = static_cast<WebCore::BackForwardListImpl*>(d->lst)->page();
-        page->goToItem(d->lst->forwardItem(), WebCore::FrameLoadTypeIndexedBackForward);
+        WebCore::Page* page = static_cast<WebCore::BackForwardList*>(d->lst)->page();
+        page->goToItem(*d->lst->forwardItem(), WebCore::FrameLoadType::IndexedBackForward);
     }
+    */
 }
 
 /*!
@@ -391,8 +409,11 @@ void QWebHistory::forward()
 */
 void QWebHistory::goToItem(const QWebHistoryItem &item)
 {
-    WebCore::Page* page = static_cast<WebCore::BackForwardListImpl*>(d->lst)->page();
-    page->goToItem(item.d->item, WebCore::FrameLoadTypeIndexedBackForward);
+    notImplemented();
+    /*
+    WebCore::Page* page = static_cast<WebCore::BackForwardList*>(d->lst)->page();
+    page->goToItem(item.d->item, WebCore::FrameLoadType::IndexedBackForward);
+    */
 }
 
 /*!
@@ -400,9 +421,13 @@ void QWebHistory::goToItem(const QWebHistoryItem &item)
 */
 QWebHistoryItem QWebHistory::backItem() const
 {
+    notImplemented();
+    return QWebHistoryItem();
+    /*
     WebCore::HistoryItem *i = d->lst->backItem();
     QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(i);
     return QWebHistoryItem(priv);
+    */
 }
 
 /*!
@@ -410,9 +435,13 @@ QWebHistoryItem QWebHistory::backItem() const
 */
 QWebHistoryItem QWebHistory::currentItem() const
 {
+    notImplemented();
+    return QWebHistoryItem();
+    /*
     WebCore::HistoryItem *i = d->lst->currentItem();
     QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(i);
     return QWebHistoryItem(priv);
+    */
 }
 
 /*!
@@ -420,9 +449,13 @@ QWebHistoryItem QWebHistory::currentItem() const
 */
 QWebHistoryItem QWebHistory::forwardItem() const
 {
+    notImplemented();
+    return QWebHistoryItem();
+    /*
     WebCore::HistoryItem *i = d->lst->forwardItem();
     QWebHistoryItemPrivate *priv = new QWebHistoryItemPrivate(i);
     return QWebHistoryItem(priv);
+    */
 }
 
 /*!
@@ -439,14 +472,18 @@ int QWebHistory::currentItemIndex() const
 */
 QWebHistoryItem QWebHistory::itemAt(int i) const
 {
+    notImplemented();
+    return QWebHistoryItem();
+    /*
     QWebHistoryItemPrivate *priv;
     if (i < 0 || i >= count())
         priv = new QWebHistoryItemPrivate(0);
     else {
-        WebCore::HistoryItem *item = d->lst->entries()[i].get();
-        priv = new QWebHistoryItemPrivate(item);
+        WebCore::HistoryItem& item = d->lst->entries()[i].get();
+        priv = new QWebHistoryItemPrivate(*item);
     }
     return QWebHistoryItem(priv);
+    */
 }
 
 /*!
@@ -543,14 +580,14 @@ QDataStream& operator>>(QDataStream& source, QWebHistory& history)
         // after clear() is new clear HistoryItem (at the end we had to remove it)
         WebCore::HistoryItem* nullItem = d->lst->currentItem();
         for (int i = 0; i < count; i++) {
-            WTF::RefPtr<WebCore::HistoryItem> item = WebCore::HistoryItem::restoreState(source, version);
+            /*WTF::RefPtr<WebCore::HistoryItem> item = WebCore::HistoryItem::restoreState(source, version);
             if (!item) {
                 // The HistoryItem internal version might have changed, do the same as when our own version change.
                 history.clear();
                 source.setStatus(QDataStream::ReadCorruptData);
                 return source;
-            }
             d->lst->addItem(item);
+            */
         }
         d->lst->removeItem(nullItem);
         history.goToItem(history.itemAt(currentIndex));
@@ -563,7 +600,7 @@ QDataStream& operator>>(QDataStream& source, QWebHistory& history)
 
 QWebPageAdapter* QWebHistoryPrivate::page()
 {
-    return QWebPageAdapter::kit(static_cast<WebCore::BackForwardListImpl*>(lst)->page());
+    return QWebPageAdapter::kit(static_cast<WebCore::BackForwardList*>(lst)->page());
 }
 
 WebCore::HistoryItem* QWebHistoryItemPrivate::core(const QWebHistoryItem* q)

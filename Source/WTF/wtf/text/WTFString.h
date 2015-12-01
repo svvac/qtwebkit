@@ -38,14 +38,6 @@ class QString;
 QT_END_NAMESPACE
 #endif
 
-#if PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class String;
-}
-}
-#endif
-
 namespace WTF {
 
 class CString;
@@ -64,7 +56,7 @@ uint64_t charactersToUInt64Strict(const UChar*, size_t, bool* ok = 0, int base =
 intptr_t charactersToIntPtrStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 intptr_t charactersToIntPtrStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 
-int charactersToInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
+WTF_EXPORT_STRING_API int charactersToInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
 WTF_EXPORT_STRING_API int charactersToInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
@@ -80,7 +72,7 @@ intptr_t charactersToIntPtr(const UChar*, size_t, bool* ok = 0); // ignores trai
 // It would be better if these were more consistent with the above functions instead.
 WTF_EXPORT_STRING_API double charactersToDouble(const LChar*, size_t, bool* ok = 0);
 WTF_EXPORT_STRING_API double charactersToDouble(const UChar*, size_t, bool* ok = 0);
-float charactersToFloat(const LChar*, size_t, bool* ok = 0);
+WTF_EXPORT_STRING_API float charactersToFloat(const LChar*, size_t, bool* ok = 0);
 WTF_EXPORT_STRING_API float charactersToFloat(const UChar*, size_t, bool* ok = 0);
 WTF_EXPORT_STRING_API float charactersToFloat(const LChar*, size_t, size_t& parsedLength);
 WTF_EXPORT_STRING_API float charactersToFloat(const UChar*, size_t, size_t& parsedLength);
@@ -126,9 +118,14 @@ public:
     WTF_EXPORT_STRING_API String(const char* characters);
 
     // Construct a string referencing an existing StringImpl.
-    String(StringImpl* impl) : m_impl(impl) { }
-    String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }
-    String(RefPtr<StringImpl> impl) : m_impl(impl) { }
+    String(StringImpl&);
+    String(StringImpl*);
+    String(PassRefPtr<StringImpl>);
+    String(Ref<StringImpl>&&);
+    String(RefPtr<StringImpl>&&);
+
+    String(Ref<AtomicStringImpl>&&);
+    String(RefPtr<AtomicStringImpl>&&);
 
     // Construct a string from a constant string literal.
     WTF_EXPORT_STRING_API String(ASCIILiteral characters);
@@ -139,14 +136,12 @@ public:
     template<unsigned charactersCount>
     String(const char (&characters)[charactersCount], ConstructFromLiteralTag) : m_impl(StringImpl::createFromLiteral<charactersCount>(characters)) { }
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     // We have to declare the copy constructor and copy assignment operator as well, otherwise
     // they'll be implicitly deleted by adding the move constructor and move assignment operator.
     String(const String& other) : m_impl(other.m_impl) { }
     String(String&& other) : m_impl(other.m_impl.release()) { }
     String& operator=(const String& other) { m_impl = other.m_impl; return *this; }
     String& operator=(String&& other) { m_impl = other.m_impl.release(); return *this; }
-#endif
 
     // Inline the destructor.
     ALWAYS_INLINE ~String() { }
@@ -171,13 +166,6 @@ public:
         return m_impl->length();
     }
 
-    const UChar* characters() const
-    {
-        if (!m_impl)
-            return 0;
-        return m_impl->characters();
-    }
-    
     const LChar* characters8() const
     {
         if (!m_impl)
@@ -196,11 +184,7 @@ public:
 
     // Return characters8() or characters16() depending on CharacterType.
     template <typename CharacterType>
-    inline const CharacterType* getCharacters() const;
-
-    // Like getCharacters() and upconvert if CharacterType is UChar on a 8bit string.
-    template <typename CharacterType>
-    inline const CharacterType* getCharactersWithUpconvert() const;
+    inline const CharacterType* characters() const;
 
     bool is8Bit() const { return m_impl->is8Bit(); }
 
@@ -214,20 +198,16 @@ public:
     WTF_EXPORT_STRING_API CString ascii() const;
     WTF_EXPORT_STRING_API CString latin1() const;
 
-    typedef enum {
-        LenientConversion,
-        StrictConversion,
-        StrictConversionReplacingUnpairedSurrogatesWithFFFD,
-    } ConversionMode;
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode) const;
+    WTF_EXPORT_STRING_API CString utf8() const;
 
-    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
-
-    UChar operator[](unsigned index) const
+    UChar at(unsigned index) const
     {
         if (!m_impl || index >= m_impl->length())
             return 0;
         return (*m_impl)[index];
     }
+    UChar operator[](unsigned index) const { return at(index); }
 
     WTF_EXPORT_STRING_API static String number(int);
     WTF_EXPORT_STRING_API static String number(unsigned int);
@@ -250,6 +230,10 @@ public:
         { return m_impl ? m_impl->find(str.impl()) : notFound; }
     size_t find(const String& str, unsigned start) const
         { return m_impl ? m_impl->find(str.impl(), start) : notFound; }
+    size_t findIgnoringASCIICase(const String& str) const
+        { return m_impl ? m_impl->findIgnoringASCIICase(str.impl()) : notFound; }
+    size_t findIgnoringASCIICase(const String& str, unsigned startOffset) const
+        { return m_impl ? m_impl->findIgnoringASCIICase(str.impl(), startOffset) : notFound; }
 
     size_t find(CharacterMatchFunctionPtr matchFunction, unsigned start = 0) const
         { return m_impl ? m_impl->find(matchFunction, start) : notFound; }
@@ -282,16 +266,25 @@ public:
         { return caseSensitive ? reverseFind(str, start) : reverseFindIgnoringCase(str, start); }
 
     WTF_EXPORT_STRING_API Vector<UChar> charactersWithNullTermination() const;
-    WTF_EXPORT_STRING_API const UChar* deprecatedCharactersWithNullTermination();
-    
+
     WTF_EXPORT_STRING_API UChar32 characterStartingAt(unsigned) const; // Ditto.
-    
+
     bool contains(UChar c) const { return find(c) != notFound; }
-    bool contains(const LChar* str, bool caseSensitive = true) const { return find(str, 0, caseSensitive) != notFound; }
-    bool contains(const String& str, bool caseSensitive = true) const { return find(str, 0, caseSensitive) != notFound; }
+    bool contains(const LChar* str, bool caseSensitive = true, unsigned startOffset = 0) const
+        { return find(str, startOffset, caseSensitive) != notFound; }
+    bool contains(const String& str) const
+        { return find(str) != notFound; }
+    bool contains(const String& str, bool caseSensitive, unsigned startOffset = 0) const
+        { return find(str, startOffset, caseSensitive) != notFound; }
+    bool containsIgnoringASCIICase(const String& str) const
+        { return findIgnoringASCIICase(str) != notFound; }
+    bool containsIgnoringASCIICase(const String& str, unsigned startOffset) const
+        { return findIgnoringASCIICase(str, startOffset) != notFound; }
 
     bool startsWith(const String& s) const
         { return m_impl ? m_impl->startsWith(s.impl()) : s.isEmpty(); }
+    bool startsWithIgnoringASCIICase(const String& s) const
+        { return m_impl ? m_impl->startsWithIgnoringASCIICase(s.impl()) : s.isEmpty(); }
     bool startsWith(const String& s, bool caseSensitive) const
         { return m_impl ? m_impl->startsWith(s.impl(), caseSensitive) : s.isEmpty(); }
     bool startsWith(UChar character) const
@@ -299,14 +292,23 @@ public:
     template<unsigned matchLength>
     bool startsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const
         { return m_impl ? m_impl->startsWith<matchLength>(prefix, caseSensitive) : !matchLength; }
+    bool hasInfixStartingAt(const String& prefix, unsigned startOffset) const
+        { return m_impl && prefix.impl() ? m_impl->hasInfixStartingAt(*prefix.impl(), startOffset) : false; }
 
-    bool endsWith(const String& s, bool caseSensitive = true) const
+    bool endsWith(const String& s) const
+        { return m_impl ? m_impl->endsWith(s.impl()) : s.isEmpty(); }
+    bool endsWithIgnoringASCIICase(const String& s) const
+        { return m_impl ? m_impl->endsWithIgnoringASCIICase(s.impl()) : s.isEmpty(); }
+    bool endsWith(const String& s, bool caseSensitive) const
         { return m_impl ? m_impl->endsWith(s.impl(), caseSensitive) : s.isEmpty(); }
     bool endsWith(UChar character) const
         { return m_impl ? m_impl->endsWith(character) : false; }
+    bool endsWith(char character) const { return endsWith(static_cast<UChar>(character)); }
     template<unsigned matchLength>
     bool endsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const
         { return m_impl ? m_impl->endsWith<matchLength>(prefix, caseSensitive) : !matchLength; }
+    bool hasInfixEndingAt(const String& suffix, unsigned endOffset) const
+        { return m_impl && suffix.impl() ? m_impl->hasInfixEndingAt(*suffix.impl(), endOffset) : false; }
 
     WTF_EXPORT_STRING_API void append(const String&);
     WTF_EXPORT_STRING_API void append(LChar);
@@ -315,7 +317,6 @@ public:
     WTF_EXPORT_STRING_API void append(const LChar*, unsigned length);
     WTF_EXPORT_STRING_API void append(const UChar*, unsigned length);
     WTF_EXPORT_STRING_API void insert(const String&, unsigned pos);
-    void insert(const UChar*, unsigned length, unsigned pos);
 
     String& replace(UChar a, UChar b) { if (m_impl) m_impl = m_impl->replace(a, b); return *this; }
     String& replace(UChar a, const String& b) { if (m_impl) m_impl = m_impl->replace(a, b.impl()); return *this; }
@@ -331,10 +332,6 @@ public:
         return *this;
     }
 
-    void makeLower() { if (m_impl) m_impl = m_impl->lower(); }
-    void makeUpper() { if (m_impl) m_impl = m_impl->upper(); }
-    void fill(UChar c) { if (m_impl) m_impl = m_impl->fill(c); }
-
     WTF_EXPORT_STRING_API void truncate(unsigned len);
     WTF_EXPORT_STRING_API void remove(unsigned pos, int len = 1);
 
@@ -343,9 +340,15 @@ public:
     String left(unsigned len) const { return substring(0, len); }
     String right(unsigned len) const { return substring(length() - len, len); }
 
-    // Returns a lowercase/uppercase version of the string
+    // Returns a lowercase/uppercase version of the string.
+    // The convertToASCIILowercase is useful in many contexts such as HTML where we don't
+    // want to do any conversion for non-ASCII letters.
+    WTF_EXPORT_STRING_API String convertToASCIILowercase() const;
     WTF_EXPORT_STRING_API String lower() const;
     WTF_EXPORT_STRING_API String upper() const;
+
+    WTF_EXPORT_STRING_API String lower(const AtomicString& localeIdentifier) const;
+    WTF_EXPORT_STRING_API String upper(const AtomicString& localeIdentifier) const;
 
     WTF_EXPORT_STRING_API String stripWhiteSpace() const;
     WTF_EXPORT_STRING_API String stripWhiteSpace(IsWhiteSpaceFunctionPtr) const;
@@ -355,7 +358,8 @@ public:
     WTF_EXPORT_STRING_API String removeCharacters(CharacterMatchFunctionPtr) const;
     template<bool isSpecialCharacter(UChar)> bool isAllSpecialCharacters() const;
 
-    // Return the string with case folded for case insensitive comparison.
+    // Returns the string with case folded for case insensitive comparison.
+    // Use convertToASCIILowercase instead if ASCII case insensitive comparison is desired.
     WTF_EXPORT_STRING_API String foldCase() const;
 
 #if !PLATFORM(QT)
@@ -384,12 +388,12 @@ public:
     WTF_EXPORT_STRING_API int toIntStrict(bool* ok = 0, int base = 10) const;
     WTF_EXPORT_STRING_API unsigned toUIntStrict(bool* ok = 0, int base = 10) const;
     WTF_EXPORT_STRING_API int64_t toInt64Strict(bool* ok = 0, int base = 10) const;
-    uint64_t toUInt64Strict(bool* ok = 0, int base = 10) const;
-    intptr_t toIntPtrStrict(bool* ok = 0, int base = 10) const;
+    WTF_EXPORT_STRING_API uint64_t toUInt64Strict(bool* ok = 0, int base = 10) const;
+    WTF_EXPORT_STRING_API intptr_t toIntPtrStrict(bool* ok = 0, int base = 10) const;
 
     WTF_EXPORT_STRING_API int toInt(bool* ok = 0) const;
     WTF_EXPORT_STRING_API unsigned toUInt(bool* ok = 0) const;
-    int64_t toInt64(bool* ok = 0) const;
+    WTF_EXPORT_STRING_API int64_t toInt64(bool* ok = 0) const;
     WTF_EXPORT_STRING_API uint64_t toUInt64(bool* ok = 0) const;
     WTF_EXPORT_STRING_API intptr_t toIntPtr(bool* ok = 0) const;
 
@@ -403,7 +407,7 @@ public:
 
 #if COMPILER_SUPPORTS(CXX_REFERENCE_QUALIFIED_FUNCTIONS)
     WTF_EXPORT_STRING_API String isolatedCopy() const &;
-    WTF_EXPORT_STRING_API String isolatedCopy() const &&;
+    WTF_EXPORT_STRING_API String isolatedCopy() &&;
 #else
     WTF_EXPORT_STRING_API String isolatedCopy() const;
 #endif
@@ -418,14 +422,14 @@ public:
     operator UnspecifiedBoolTypeB() const;
 
 #if USE(CF)
-    String(CFStringRef);
-    RetainPtr<CFStringRef> createCFString() const;
+    WTF_EXPORT_STRING_API String(CFStringRef);
+    WTF_EXPORT_STRING_API RetainPtr<CFStringRef> createCFString() const;
 #endif
 
 #ifdef __OBJC__
-    String(NSString*);
-    
-    // This conversion maps NULL to "", which loses the meaning of NULL, but we 
+    WTF_EXPORT_STRING_API String(NSString*);
+
+    // This conversion maps NULL to "", which loses the meaning of NULL, but we
     // need this mapping because AppKit crashes when passed nil NSStrings.
     operator NSString*() const { if (!m_impl) return @""; return *m_impl; }
 #endif
@@ -434,11 +438,6 @@ public:
     WTF_EXPORT_STRING_API String(const QString&);
     WTF_EXPORT_STRING_API String(const QStringRef&);
     WTF_EXPORT_STRING_API operator QString() const;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    String(const BlackBerry::Platform::String&);
-    operator BlackBerry::Platform::String() const;
 #endif
 
     WTF_EXPORT_STRING_API static String make8BitFrom16BitSource(const UChar*, size_t);
@@ -461,15 +460,15 @@ public:
     // Tries to convert the passed in string to UTF-8, but will fall back to Latin-1 if the string is not valid UTF-8.
     WTF_EXPORT_STRING_API static String fromUTF8WithLatin1Fallback(const LChar*, size_t);
     static String fromUTF8WithLatin1Fallback(const char* s, size_t length) { return fromUTF8WithLatin1Fallback(reinterpret_cast<const LChar*>(s), length); };
-    
+
     // Determines the writing direction using the Unicode Bidi Algorithm rules P2 and P3.
-    WTF::Unicode::Direction defaultWritingDirection(bool* hasStrongDirectionality = 0) const
+    UCharDirection defaultWritingDirection(bool* hasStrongDirectionality = nullptr) const
     {
         if (m_impl)
             return m_impl->defaultWritingDirection(hasStrongDirectionality);
         if (hasStrongDirectionality)
             *hasStrongDirectionality = false;
-        return WTF::Unicode::LeftToRight;
+        return U_LEFT_TO_RIGHT;
     }
 
     bool containsOnlyASCII() const;
@@ -529,7 +528,11 @@ inline bool equalIgnoringCase(const String& a, const char* b) { return equalIgno
 inline bool equalIgnoringCase(const LChar* a, const String& b) { return equalIgnoringCase(a, b.impl()); }
 inline bool equalIgnoringCase(const char* a, const String& b) { return equalIgnoringCase(reinterpret_cast<const LChar*>(a), b.impl()); }
 
-inline bool equalPossiblyIgnoringCase(const String& a, const String& b, bool ignoreCase) 
+inline bool equalIgnoringASCIICase(const String& a, const String& b) { return equalIgnoringASCIICase(a.impl(), b.impl()); }
+template<unsigned charactersCount>
+inline bool equalIgnoringASCIICase(const String& a, const char (&b)[charactersCount]) { return equalIgnoringASCIICase<charactersCount>(a.impl(), b); }
+
+inline bool equalPossiblyIgnoringCase(const String& a, const String& b, bool ignoreCase)
 {
     return ignoreCase ? equalIgnoringCase(a, b) : (a == b);
 }
@@ -545,37 +548,59 @@ inline void swap(String& a, String& b) { a.swap(b); }
 
 // Definitions of string operations
 
+inline String::String(StringImpl& impl)
+    : m_impl(&impl)
+{
+}
+
+inline String::String(StringImpl* impl)
+    : m_impl(impl)
+{
+}
+
+inline String::String(PassRefPtr<StringImpl> impl)
+    : m_impl(impl)
+{
+}
+
+inline String::String(Ref<StringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(RefPtr<StringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(Ref<AtomicStringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(RefPtr<AtomicStringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
 template<size_t inlineCapacity, typename OverflowHandler>
 String::String(const Vector<UChar, inlineCapacity, OverflowHandler>& vector)
-    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : StringImpl::empty())
+    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : Ref<StringImpl>(*StringImpl::empty()))
 {
 }
 
 template<>
-inline const LChar* String::getCharacters<LChar>() const
+inline const LChar* String::characters<LChar>() const
 {
     ASSERT(is8Bit());
     return characters8();
 }
 
 template<>
-inline const UChar* String::getCharacters<UChar>() const
+inline const UChar* String::characters<UChar>() const
 {
     ASSERT(!is8Bit());
     return characters16();
-}
-
-template<>
-inline const LChar* String::getCharactersWithUpconvert<LChar>() const
-{
-    ASSERT(is8Bit());
-    return characters8();
-}
-
-template<>
-inline const UChar* String::getCharactersWithUpconvert<UChar>() const
-{
-    return characters();
 }
 
 inline bool String::containsOnlyLatin1() const
@@ -619,12 +644,6 @@ inline bool codePointCompareLessThan(const String& a, const String& b)
     return codePointCompare(a.impl(), b.impl()) < 0;
 }
 
-template<size_t inlineCapacity>
-inline void append(Vector<UChar, inlineCapacity>& vector, const String& string)
-{
-    vector.append(string.characters(), string.length());
-}
-
 template<typename CharacterType>
 inline void appendNumber(Vector<CharacterType>& vector, unsigned char number)
 {
@@ -636,10 +655,12 @@ inline void appendNumber(Vector<CharacterType>& vector, unsigned char number)
     case 3:
         vector[vectorSize + 2] = number % 10 + '0';
         number /= 10;
+        FALLTHROUGH;
 
     case 2:
         vector[vectorSize + 1] = number % 10 + '0';
         number /= 10;
+        FALLTHROUGH;
 
     case 1:
         vector[vectorSize] = number % 10 + '0';
@@ -666,7 +687,7 @@ inline bool String::isAllSpecialCharacters() const
 
     if (is8Bit())
         return WTF::isAllSpecialCharacters<isSpecialCharacter, LChar>(characters8(), len);
-    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(characters(), len);
+    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(characters16(), len);
 }
 
 // StringHash is the default hash for String
@@ -686,6 +707,25 @@ private:
     const char* m_characters;
 };
 
+// For thread-safe lambda capture:
+// StringCapture stringCapture(string);
+// auto lambdaThatRunsInOtherThread = [stringCapture] { String string = stringCapture.string(); ... }
+// FIXME: Remove when we can use C++14 initialized lambda capture: [string = string.isolatedCopy()].
+class StringCapture {
+public:
+    StringCapture() { }
+    StringCapture(const String& string) : m_string(string) { }
+    explicit StringCapture(String&& string) : m_string(string) { }
+    StringCapture(const StringCapture& other) : m_string(other.m_string.isolatedCopy()) { }
+    const String& string() const { return m_string; }
+    String releaseString() { return WTF::move(m_string); }
+
+    void operator=(const StringCapture& other) { m_string = other.m_string.isolatedCopy(); }
+
+private:
+    String m_string;
+};
+
 // Shared global empty string.
 WTF_EXPORT_STRING_API const String& emptyString();
 
@@ -695,7 +735,6 @@ using WTF::CString;
 using WTF::KeepTrailingZeros;
 using WTF::String;
 using WTF::emptyString;
-using WTF::append;
 using WTF::appendNumber;
 using WTF::charactersAreAllASCII;
 using WTF::charactersToIntStrict;
@@ -717,6 +756,7 @@ using WTF::isAllSpecialCharacters;
 using WTF::isSpaceOrNewline;
 using WTF::reverseFind;
 using WTF::ASCIILiteral;
+using WTF::StringCapture;
 
 #include <wtf/text/AtomicString.h>
 #endif

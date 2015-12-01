@@ -33,8 +33,6 @@
 #include <QtCore/QList>
 #include <QtGui/QImageReader>
 #include <QtGui/QPixmap>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -68,8 +66,8 @@ private:
 
 private:
     QByteArray m_format;
-    OwnPtr<QBuffer> m_buffer;
-    OwnPtr<QImageReader> m_reader;
+    QScopedPointer<QBuffer> m_buffer;
+    QScopedPointer<QImageReader> m_reader;
     mutable int m_repetitionCount;
 };
 

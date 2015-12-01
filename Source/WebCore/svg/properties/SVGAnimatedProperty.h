@@ -21,7 +21,6 @@
 #ifndef SVGAnimatedProperty_h
 #define SVGAnimatedProperty_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedPropertyDescription.h"
 #include "SVGPropertyInfo.h"
 #include <wtf/RefCounted.h>
@@ -49,18 +48,18 @@ public:
     virtual ~SVGAnimatedProperty();
 
     template<typename OwnerType, typename TearOffType, typename PropertyType>
-    static PassRefPtr<TearOffType> lookupOrCreateWrapper(OwnerType* element, const SVGPropertyInfo* info, PropertyType& property)
+    static TearOffType& lookupOrCreateWrapper(OwnerType* element, const SVGPropertyInfo* info, PropertyType& property)
     {
         ASSERT(info);
         SVGAnimatedPropertyDescription key(element, info->propertyIdentifier);
-        RefPtr<SVGAnimatedProperty> wrapper = animatedPropertyCache()->get(key);
-        if (!wrapper) {
-            wrapper = TearOffType::create(element, info->attributeName, info->animatedPropertyType, property);
+        auto& slot = animatedPropertyCache()->add(key, nullptr).iterator->value;
+        if (!slot) {
+            Ref<SVGAnimatedProperty> wrapper = TearOffType::create(element, info->attributeName, info->animatedPropertyType, property);
             if (info->animatedPropertyState == PropertyIsReadOnly)
                 wrapper->setIsReadOnly();
-            animatedPropertyCache()->set(key, wrapper.get());
+            slot = &wrapper.leakRef();
         }
-        return static_pointer_cast<TearOffType>(wrapper);
+        return static_cast<TearOffType&>(*slot);
     }
 
     template<typename OwnerType, typename TearOffType>
@@ -94,5 +93,4 @@ protected:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimatedProperty_h

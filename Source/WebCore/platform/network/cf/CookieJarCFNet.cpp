@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,8 +28,9 @@
 
 #if USE(CFNETWORK)
 
+#include "CFNetworkSPI.h"
 #include "Cookie.h"
-#include "KURL.h"
+#include "URL.h"
 #include "NetworkStorageSession.h"
 #include "SoftLinking.h"
 #include <CFNetwork/CFHTTPCookiesPriv.h>
@@ -39,6 +40,12 @@
 #if PLATFORM(WIN)
 #include <WebKitSystemInterface/WebKitSystemInterface.h>
 #include <windows.h>
+#endif
+
+#if PLATFORM(WIN) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED <= 1090)
+enum {
+    CFHTTPCookieStorageAcceptPolicyExclusivelyFromMainDocumentDomain = 3
+};
 #endif
 
 namespace WebCore {
@@ -73,6 +80,7 @@ static inline RetainPtr<CFStringRef> cookieValue(CFHTTPCookieRef cookie)
 
 static RetainPtr<CFArrayRef> filterCookies(CFArrayRef unfilteredCookies)
 {
+    ASSERT(unfilteredCookies);
     CFIndex count = CFArrayGetCount(unfilteredCookies);
     RetainPtr<CFMutableArrayRef> filteredCookies = adoptCF(CFArrayCreateMutable(0, count, &kCFTypeArrayCallBacks));
     for (CFIndex i = 0; i < count; ++i) {
@@ -93,7 +101,33 @@ static RetainPtr<CFArrayRef> filterCookies(CFArrayRef unfilteredCookies)
     return filteredCookies;
 }
 
-void setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& value)
+static RetainPtr<CFArrayRef> copyCookiesForURLWithFirstPartyURL(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
+{
+    bool secure = url.protocolIs("https");
+
+#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
+    return adoptCF(_CFHTTPCookieStorageCopyCookiesForURLWithMainDocumentURL(session.cookieStorage().get(), url.createCFURL().get(), firstParty.createCFURL().get(), secure));
+#else
+    // _CFHTTPCookieStorageCopyCookiesForURLWithMainDocumentURL is not available on other platforms.
+    UNUSED_PARAM(firstParty);
+    return adoptCF(CFHTTPCookieStorageCopyCookiesForURL(session.cookieStorage().get(), url.createCFURL().get(), secure));
+#endif
+}
+
+static CFArrayRef createCookies(CFDictionaryRef headerFields, CFURLRef url)
+{
+#if PLATFORM(IOS)
+    CFArrayRef parsedCookies = _CFHTTPParsedCookiesWithResponseHeaderFields(kCFAllocatorDefault, headerFields, url);
+#else
+    CFArrayRef parsedCookies = CFHTTPCookieCreateWithResponseHeaderFields(kCFAllocatorDefault, headerFields, url);
+#endif
+    if (!parsedCookies)
+        parsedCookies = CFArrayCreate(kCFAllocatorDefault, 0, 0, &kCFTypeArrayCallBacks);
+
+    return parsedCookies;
+}
+
+void setCookiesFromDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url, const String& value)
 {
     // <rdar://problem/5632883> CFHTTPCookieStorage stores an empty cookie, which would be sent as "Cookie: =".
     if (value.isEmpty())
@@ -111,46 +145,35 @@ void setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstPa
         (const void**)&s_setCookieKeyCF, (const void**)&cookieStringCF, 1,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
 
-    RetainPtr<CFArrayRef> cookiesCF = adoptCF(CFHTTPCookieCreateWithResponseHeaderFields(kCFAllocatorDefault,
-        headerFieldsCF.get(), urlCF.get()));
-
-    CFHTTPCookieStorageSetCookies(session.cookieStorage().get(), filterCookies(cookiesCF.get()).get(), urlCF.get(), firstPartyForCookiesCF.get());
+    RetainPtr<CFArrayRef> unfilteredCookies = adoptCF(createCookies(headerFieldsCF.get(), urlCF.get()));
+    CFHTTPCookieStorageSetCookies(session.cookieStorage().get(), filterCookies(unfilteredCookies.get()).get(), urlCF.get(), firstPartyForCookiesCF.get());
 }
 
-String cookiesForDOM(const NetworkStorageSession& session, const KURL&, const KURL& url)
+String cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
-    RetainPtr<CFURLRef> urlCF = url.createCFURL();
-
-    bool secure = url.protocolIs("https");
-    RetainPtr<CFArrayRef> cookiesCF = adoptCF(CFHTTPCookieStorageCopyCookiesForURL(session.cookieStorage().get(), urlCF.get(), secure));
+    RetainPtr<CFArrayRef> cookiesCF = copyCookiesForURLWithFirstPartyURL(session, firstParty, url);
     RetainPtr<CFDictionaryRef> headerCF = adoptCF(CFHTTPCookieCopyRequestHeaderFields(kCFAllocatorDefault, filterCookies(cookiesCF.get()).get()));
     return (CFStringRef)CFDictionaryGetValue(headerCF.get(), s_cookieCF);
 }
 
-String cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& /*firstParty*/, const KURL& url)
+String cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
-    RetainPtr<CFURLRef> urlCF = url.createCFURL();
-
-    bool secure = url.protocolIs("https");
-    RetainPtr<CFArrayRef> cookiesCF = adoptCF(CFHTTPCookieStorageCopyCookiesForURL(session.cookieStorage().get(), urlCF.get(), secure));
+    RetainPtr<CFArrayRef> cookiesCF = copyCookiesForURLWithFirstPartyURL(session, firstParty, url);
     RetainPtr<CFDictionaryRef> headerCF = adoptCF(CFHTTPCookieCopyRequestHeaderFields(kCFAllocatorDefault, cookiesCF.get()));
     return (CFStringRef)CFDictionaryGetValue(headerCF.get(), s_cookieCF);
 }
 
-bool cookiesEnabled(const NetworkStorageSession& session, const KURL& /*firstParty*/, const KURL& /*url*/)
+bool cookiesEnabled(const NetworkStorageSession& session, const URL& /*firstParty*/, const URL& /*url*/)
 {
     CFHTTPCookieStorageAcceptPolicy policy = CFHTTPCookieStorageGetCookieAcceptPolicy(session.cookieStorage().get());
-    return policy == CFHTTPCookieStorageAcceptPolicyOnlyFromMainDocumentDomain || policy == CFHTTPCookieStorageAcceptPolicyAlways;
+    return policy == CFHTTPCookieStorageAcceptPolicyOnlyFromMainDocumentDomain || policy == CFHTTPCookieStorageAcceptPolicyExclusivelyFromMainDocumentDomain || policy == CFHTTPCookieStorageAcceptPolicyAlways;
 }
 
-bool getRawCookies(const NetworkStorageSession& session, const KURL& /*firstParty*/, const KURL& url, Vector<Cookie>& rawCookies)
+bool getRawCookies(const NetworkStorageSession& session, const URL& firstParty, const URL& url, Vector<Cookie>& rawCookies)
 {
     rawCookies.clear();
 
-    RetainPtr<CFURLRef> urlCF = url.createCFURL();
-
-    bool sendSecureCookies = url.protocolIs("https");
-    RetainPtr<CFArrayRef> cookiesCF = adoptCF(CFHTTPCookieStorageCopyCookiesForURL(session.cookieStorage().get(), urlCF.get(), sendSecureCookies));
+    RetainPtr<CFArrayRef> cookiesCF = copyCookiesForURLWithFirstPartyURL(session, firstParty, url);
 
     CFIndex count = CFArrayGetCount(cookiesCF.get());
     rawCookies.reserveCapacity(count);
@@ -174,7 +197,7 @@ bool getRawCookies(const NetworkStorageSession& session, const KURL& /*firstPart
     return true;
 }
 
-void deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& name)
+void deleteCookie(const NetworkStorageSession& session, const URL& url, const String& name)
 {
     RetainPtr<CFHTTPCookieStorageRef> cookieStorage = session.cookieStorage();
 
@@ -207,27 +230,20 @@ void getHostnamesWithCookies(const NetworkStorageSession& session, HashSet<Strin
     }
 }
 
-void deleteCookiesForHostname(const NetworkStorageSession& session, const String& hostname)
-{
-    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = session.cookieStorage();
-
-    RetainPtr<CFArrayRef> cookiesCF = adoptCF(CFHTTPCookieStorageCopyCookies(cookieStorage.get()));
-    if (!cookiesCF)
-        return;
-
-    CFIndex count = CFArrayGetCount(cookiesCF.get());
-    for (CFIndex i = count - 1; i >=0; i--) {
-        CFHTTPCookieRef cookie = static_cast<CFHTTPCookieRef>(const_cast<void *>(CFArrayGetValueAtIndex(cookiesCF.get(), i)));
-        RetainPtr<CFStringRef> domain = cookieDomain(cookie);
-        if (String(domain.get()) == hostname)
-            CFHTTPCookieStorageDeleteCookie(cookieStorage.get(), cookie);
-    }
-}
-
 void deleteAllCookies(const NetworkStorageSession& session)
 {
     CFHTTPCookieStorageDeleteAllCookies(session.cookieStorage().get());
 }
+
+#if PLATFORM(WIN)
+void deleteCookiesForHostnames(const NetworkStorageSession& session, const Vector<String>& hostnames)
+{
+}
+
+void deleteAllCookiesModifiedSince(const NetworkStorageSession&, std::chrono::system_clock::time_point)
+{
+}
+#endif
 
 } // namespace WebCore
 

@@ -47,16 +47,13 @@
 #include "GraphicsContext.h"
 #include "IconLoader.h"
 #include "IntPoint.h"
-#include "KURL.h"
+#include "URL.h"
 #include "Language.h"
 #include "LocalizedStrings.h"
 #include "Node.h"
 #include "NotImplemented.h"
 #include "Path.h"
 #include "PlatformMouseEvent.h"
-#include "PluginDatabase.h"
-#include "PluginPackage.h"
-#include "PluginView.h"
 #include "RenderTheme.h"
 #include "SharedBuffer.h"
 #include "TextBoundaries.h"
@@ -104,7 +101,7 @@ void getSupportedKeySizes(Vector<String>&)
     notImplemented();
 }
 
-String signedPublicKeyAndChallengeString(unsigned, const String&, const KURL&)
+String signedPublicKeyAndChallengeString(unsigned, const String&, const URL&)
 {
     return String();
 }

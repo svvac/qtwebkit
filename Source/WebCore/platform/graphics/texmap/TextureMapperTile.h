@@ -20,7 +20,7 @@
 #ifndef TextureMapperTile_h
 #define TextureMapperTile_h
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER)
 
 #include "FloatRect.h"
 #include "Image.h"
@@ -34,13 +34,13 @@ class GraphicsLayer;
 
 class TextureMapperTile {
 public:
-    inline PassRefPtr<BitmapTexture> texture() const { return m_texture; }
+    inline RefPtr<BitmapTexture> texture() const { return m_texture; }
     inline FloatRect rect() const { return m_rect; }
     inline void setTexture(BitmapTexture* texture) { m_texture = texture; }
     inline void setRect(const FloatRect& rect) { m_rect = rect; }
 
     void updateContents(TextureMapper*, Image*, const IntRect&, BitmapTexture::UpdateContentsFlag UpdateCanModifyOriginalImageData);
-    void updateContents(TextureMapper*, GraphicsLayer*, const IntRect&, BitmapTexture::UpdateContentsFlag UpdateCanModifyOriginalImageData);
+    void updateContents(TextureMapper*, GraphicsLayer*, const IntRect&, BitmapTexture::UpdateContentsFlag UpdateCanModifyOriginalImageData, float scale = 1);
     virtual void paint(TextureMapper*, const TransformationMatrix&, float, const unsigned exposedEdges);
     virtual ~TextureMapperTile() { }
 

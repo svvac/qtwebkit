@@ -43,22 +43,6 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void QtTestSupport::clearMemoryCaches()
-{
-    if (!memoryCache()->disabled()) {
-        memoryCache()->setDisabled(true);
-        memoryCache()->setDisabled(false);
-    }
-
-    int pageCapacity = WebCore::pageCache()->capacity();
-    WebCore::pageCache()->setCapacity(0);
-    WebCore::pageCache()->setCapacity(pageCapacity);
-
-    WebCore::fontCache()->invalidate();
-
-    WebCore::CrossOriginPreflightResultCache::shared().empty();
-}
-
 void QtTestSupport::initializeTestFonts()
 {
 #if HAVE(FONTCONFIG)

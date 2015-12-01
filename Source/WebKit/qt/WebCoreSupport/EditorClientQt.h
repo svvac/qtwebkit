@@ -64,19 +64,24 @@ public:
     virtual bool shouldInsertText(const String&, Range*, EditorInsertAction);
     virtual bool shouldChangeSelectedRange(Range* fromRange, Range* toRange, EAffinity, bool stillSelecting);
 
-    virtual bool shouldApplyStyle(StylePropertySet*, Range*);
-
+    virtual bool shouldApplyStyle(StyleProperties*, Range*);
+    virtual void didApplyStyle();
     virtual bool shouldMoveRangeAfterDelete(Range*, Range*);
 
     virtual void didBeginEditing();
     virtual void respondToChangedContents();
     virtual void respondToChangedSelection(Frame*);
+    virtual void didChangeSelectionAndUpdateLayout();
     virtual void didEndEditing();
     virtual void willWriteSelectionToPasteboard(Range*);
     virtual void didWriteSelectionToPasteboard();
     virtual void getClientPasteboardDataForRange(Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<WebCore::SharedBuffer> >& pasteboardData);
     virtual void didSetSelectionTypesForPasteboard();
-    
+
+    // Notify an input method that a composition was voluntarily discarded by WebCore, so that it could clean up too.
+    // This function is not called when a composition is closed per a request from an input method.
+    virtual void discardedComposition(Frame*);
+
     virtual void registerUndoStep(PassRefPtr<UndoStep>);
     virtual void registerRedoStep(PassRefPtr<UndoStep>);
     virtual void clearUndoRedoOperations();
@@ -98,6 +103,7 @@ public:
     virtual bool doTextFieldCommandFromEvent(Element*, KeyboardEvent*);
     virtual void textWillBeDeletedInTextField(Element*);
     virtual void textDidChangeInTextArea(Element*);
+    virtual void overflowScrollPositionChanged();
 
     virtual void updateSpellingUIWithGrammarString(const String&, const GrammarDetail&);
     virtual void updateSpellingUIWithMisspelledWord(const String&);
@@ -107,7 +113,7 @@ public:
     virtual void setInputMethodState(bool enabled);
     virtual TextCheckerClient* textChecker() { return &m_textCheckerClient; }
 
-    virtual bool supportsGlobalSelection() OVERRIDE;
+    virtual bool supportsGlobalSelection() override;
 
     bool isEditing() const;
 

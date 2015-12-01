@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,6 +32,7 @@
 
 namespace WebCore {
 
+#if !PLATFORM(IOS)
 static CGRect accessibilityConvertScreenRect(CGRect bounds)
 {
     NSArray *screens = [NSScreen screens];
@@ -43,17 +44,19 @@ static CGRect accessibilityConvertScreenRect(CGRect bounds)
     
     return bounds;
 }
+#endif // !PLATFORM(IOS)
     
     
-void FrameSelection::notifyAccessibilityForSelectionChange()
+void FrameSelection::notifyAccessibilityForSelectionChange(const AXTextStateChangeIntent& intent)
 {
     Document* document = m_frame->document();
 
     if (m_selection.start().isNotNull() && m_selection.end().isNotNull()) {
         if (AXObjectCache* cache = document->existingAXObjectCache())
-            cache->postNotification(m_selection.start().deprecatedNode()->renderer(), AXObjectCache::AXSelectedTextChanged, false);
+            cache->postTextStateChangeNotification(m_selection.start(), intent, m_selection);
     }
 
+#if !PLATFORM(IOS)
     // if zoom feature is enabled, insertion point changes should update the zoom
     if (!UAZoomEnabled() || !m_selection.isCaret())
         return;
@@ -66,7 +69,7 @@ void FrameSelection::notifyAccessibilityForSelectionChange()
         return;
 
     IntRect selectionRect = absoluteCaretBounds();
-    IntRect viewRect = pixelSnappedIntRect(renderView->viewRect());
+    IntRect viewRect = snappedIntRect(renderView->viewRect());
 
     selectionRect = frameView->contentsToScreen(selectionRect);
     viewRect = frameView->contentsToScreen(viewRect);
@@ -76,6 +79,7 @@ void FrameSelection::notifyAccessibilityForSelectionChange()
     cgViewRect = accessibilityConvertScreenRect(cgViewRect);
 
     UAZoomChangeFocus(&cgViewRect, &cgCaretRect, kUAZoomFocusTypeInsertionPoint);
+#endif // !PLATFORM(IOS)
 }
 
 } // namespace WebCore

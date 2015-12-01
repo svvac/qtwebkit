@@ -24,6 +24,41 @@
 
 require 'risc'
 
+# GPR conventions, to match the baseline JIT
+#
+# $a0 => a0
+# $a1 => a1
+# $a2 => a2
+# $a3 => a3
+# $v0 => t0, r0
+# $v1 => t1, r1
+# $t2 =>         t2
+# $t3 =>         t3
+# $t4 =>         t4
+# $t5 =>         t5
+# $t6 =>            (scratch)
+# $t7 =>            (scratch)
+# $t8 =>            (scratch)
+# $t9 =>            (stores the callee of a call opcode)
+# $gp =>            (globals)
+# $s4 =>            (callee-save used to preserve $gp across calls)
+# $ra => lr
+# $sp => sp
+# $fp => cfr
+#
+# FPR conventions, to match the baseline JIT
+# We don't have fa2 or fa3!
+#  $f0 => ft0, fr
+#  $f2 => ft1
+#  $f4 => ft2
+#  $f6 => ft3
+#  $f8 => ft4
+# $f10 => ft5
+# $f12 =>        fa0
+# $f14 =>        fa1
+# $f16 =>            (scratch)
+# $f18 =>            (scratch)
+
 class Assembler
     def putStr(str)
         @outp.puts str
@@ -57,8 +92,7 @@ class SpecialRegister < NoChildren
     end
 end
 
-MIPS_TEMP_GPRS = [SpecialRegister.new("$t5"), SpecialRegister.new("$t6"), SpecialRegister.new("$t7"),
-                    SpecialRegister.new("$t8")]
+MIPS_TEMP_GPRS = [SpecialRegister.new("$t6"), SpecialRegister.new("$t7"), SpecialRegister.new("$t8")]
 MIPS_ZERO_REG = SpecialRegister.new("$zero")
 MIPS_GP_REG = SpecialRegister.new("$gp")
 MIPS_GPSAVE_REG = SpecialRegister.new("$s4")
@@ -81,26 +115,24 @@ class RegisterID
             "$a0"
         when "a1"
             "$a1"
-        when "r0", "t0"
+        when "a2"
+            "$a2"
+        when "a3"
+            "$a3"
+        when "t0", "r0"
             "$v0"
-        when "r1", "t1"
+        when "t1", "r1"
             "$v1"
         when "t2"
             "$t2"
         when "t3"
-            "$s3"
-        when "t4"   # PC reg in llint
-            "$s2"
+            "$t3"
+        when "t4"
+            "$t4"
         when "t5"
             "$t5"
-        when "t6"
-            "$t6"
-        when "t7"
-            "$t7"
-        when "t8"
-            "$t8"
         when "cfr"
-            "$s0"
+            "$fp"
         when "lr"
             "$ra"
         when "sp"
@@ -138,7 +170,7 @@ end
 
 class Immediate
     def mipsOperand
-        raise "Invalid immediate #{value} at #{codeOriginString}" if value < -0x7fff or value > 0x7fff
+        raise "Invalid immediate #{value} at #{codeOriginString}" if value < -0x7fff or value > 0xffff
         "#{value}"
     end
 end
@@ -231,10 +263,9 @@ def lowerMIPSCondBranch(list, condOp, node)
                                 [node.operands[0], MIPS_ZERO_REG, node.operands[-1]],
                                 node.annotation)
     elsif node.operands.size == 3
-        tl = condOp[-1, 1]
         tmp = Tmp.new(node.codeOrigin, :gpr)
         list << Instruction.new(node.codeOrigin,
-                                "and" + tl,
+                                "andi",
                                 [node.operands[0], node.operands[1], tmp],
                                 node.annotation)
         list << Instruction.new(node.codeOrigin,
@@ -371,46 +402,93 @@ end
 #
 
 class Node
-    def mipsLowerMalformedAddressesRecurse(list, topLevelNode, &block)
+    def mipsLowerMalformedAddressesRecurse(list)
         mapChildren {
             | subNode |
-            subNode.mipsLowerMalformedAddressesRecurse(list, topLevelNode, &block)
+            subNode.mipsLowerMalformedAddressesRecurse(list)
+        }
+    end
+
+    def mipsLowerShiftedAddressesRecurse(list, isFirst, tmp)
+        mapChildren {
+            | subNode |
+            subNode.mipsLowerShiftedAddressesRecurse(list, isFirst, tmp)
         }
     end
 end
 
-class Address
-    def mipsLowerMalformedAddressesRecurse(list, node, &block)
-        riscLowerMalformedAddressesRecurse(list, node, &block)
-    end
-end
-
 class BaseIndex
-    def mipsLowerMalformedAddressesRecurse(list, node, &block)
+    def mipsLowerMalformedAddressesRecurse(list)
+        tmp = Tmp.new(codeOrigin, :gpr)
         if scaleShift == 0
-            tmp0 = Tmp.new(codeOrigin, :gpr)
-            list << Instruction.new(codeOrigin, "addp", [base, index, tmp0])
-            Address.new(codeOrigin, tmp0, Immediate.new(codeOrigin, offset.value));
-        else
-            tmp0 = Tmp.new(codeOrigin, :gpr)
-            list << Instruction.new(codeOrigin, "lshifti", [index, Immediate.new(codeOrigin, scaleShift), tmp0]);
-            list << Instruction.new(codeOrigin, "addp", [base, tmp0])
-            Address.new(codeOrigin, tmp0, Immediate.new(codeOrigin, offset.value));
+            list << Instruction.new(codeOrigin, "addp", [base, index, tmp])
+            Address.new(codeOrigin, tmp, Immediate.new(codeOrigin, offset.value));
         end
     end
-end
 
-class AbsoluteAddress
-    def mipsLowerMalformedAddressesRecurse(list, node, &block)
-        riscLowerMalformedAddressesRecurse(list, node, &block)
+    def mipsLowerShiftedAddressesRecurse(list, isFirst, tmp)
+        if isFirst
+            list << Instruction.new(codeOrigin, "lshifti", [index, Immediate.new(codeOrigin, scaleShift), tmp]);
+            list << Instruction.new(codeOrigin, "addp", [base, tmp])
+        end
+        Address.new(codeOrigin, tmp, Immediate.new(codeOrigin, offset.value));
     end
 end
 
-def mipsLowerMalformedAddresses(list, &block)
-    newList = []
-    list.each {
-        | node |
-        newList << node.mipsLowerMalformedAddressesRecurse(newList, node, &block)
+#
+# Lowering of BaseIndex addresses with optimization for MIPS.
+#
+# offline asm instruction pair:
+#   loadi 4[cfr, t0, 8], t2
+#   loadi 0[cfr, t0, 8], t0
+#
+# lowered instructions: 
+#   lshifti t0, 3, tmp
+#   addp    cfr, tmp
+#   loadi   4[tmp], t2
+#   loadi   0[tmp], t0
+#
+
+def mipsHasShiftedBaseIndexAddress(instruction)
+    instruction.operands.each_with_index {
+        | operand, index |
+        if operand.is_a? BaseIndex and operand.scaleShift != 0
+            return index
+        end
+    }
+    -1
+end
+
+def mipsScaleOfBaseIndexMatches(baseIndex0, baseIndex1)
+    baseIndex0.base == baseIndex1.base and
+    baseIndex0.index == baseIndex1.index and
+    baseIndex0.scale == baseIndex1.scale
+end
+
+def mipsLowerBaseIndexAddresses(list)
+    newList = [ list[0] ]
+    tmp = nil
+    list.each_cons(2) {
+        | nodes |
+        if nodes[1].is_a? Instruction
+            ind = mipsHasShiftedBaseIndexAddress(nodes[1])
+            if ind != -1
+                if nodes[0].is_a? Instruction and
+                    nodes[0].opcode == nodes[1].opcode and
+                    ind == mipsHasShiftedBaseIndexAddress(nodes[0]) and
+                    mipsScaleOfBaseIndexMatches(nodes[0].operands[ind], nodes[1].operands[ind])
+
+                    newList << nodes[1].mipsLowerShiftedAddressesRecurse(newList, false, tmp)
+                else
+                    tmp = Tmp.new(codeOrigin, :gpr)
+                    newList << nodes[1].mipsLowerShiftedAddressesRecurse(newList, true, tmp)
+                end
+            else
+                newList << nodes[1].mipsLowerMalformedAddressesRecurse(newList)
+            end
+        else
+            newList << nodes[1]
+        end
     }
     newList
 end
@@ -442,6 +520,8 @@ def mipsLowerMisplacedImmediates(list)
                 else
                     newList << node
                 end
+            when /^(addi|subi)/
+                newList << node.riscLowerMalformedImmediatesRecurse(newList, -0x7fff..0x7fff)
             else
                 newList << node
             end
@@ -503,10 +583,6 @@ def mipsLowerMisplacedAddresses(list)
             when "sltub", "sltb"
                 newList << Instruction.new(node.codeOrigin,
                                            node.opcode,
-                                           riscAsRegisters(newList, [], node.operands, "b"))
-            when "andb"
-                newList << Instruction.new(node.codeOrigin,
-                                           "andi",
                                            riscAsRegisters(newList, [], node.operands, "b"))
             when /^(bz|bnz|bs|bo)/
                 tl = $~.post_match == "" ? "i" : $~.post_match
@@ -624,7 +700,8 @@ class Sequence
         result = riscLowerSimpleBranchOps(result)
         result = riscLowerHardBranchOps(result)
         result = riscLowerShiftOps(result)
-        result = mipsLowerMalformedAddresses(result) {
+        result = mipsLowerBaseIndexAddresses(result)
+        result = riscLowerMalformedAddresses(result) {
             | node, address |
             if address.is_a? Address
                 (-0xffff..0xffff).include? address.offset.value
@@ -864,11 +941,17 @@ class Instruction
             # FIXME: either support this or remove it.
             raise "MIPS does not support this opcode yet, #{codeOrigin}"
         when "pop"
-            $asm.puts "lw #{operands[0].mipsOperand}, 0($sp)"
-            $asm.puts "addiu $sp, $sp, 4"
+            operands.each {
+                | op |
+                $asm.puts "lw #{op.mipsOperand}, 0($sp)"
+                $asm.puts "addiu $sp, $sp, 4"
+            }
         when "push"
-            $asm.puts "addiu $sp, $sp, -4"
-            $asm.puts "sw #{operands[0].mipsOperand}, 0($sp)"
+            operands.each {
+                | op |
+                $asm.puts "addiu $sp, $sp, -4"
+                $asm.puts "sw #{op.mipsOperand}, 0($sp)"
+            }
         when "move", "sxi2p", "zxi2p"
             if operands[0].is_a? Immediate
                 mipsMoveImmediate(operands[0].value, operands[1])
@@ -953,8 +1036,10 @@ class Instruction
         when "pichdr"
             $asm.putStr("OFFLINE_ASM_CPLOAD(#{MIPS_CALL_REG.mipsOperand})")
             $asm.puts "move #{MIPS_GPSAVE_REG.mipsOperand}, #{MIPS_GP_REG.mipsOperand}"
+        when "memfence"
+            $asm.puts "sync"
         else
-            raise "Unhandled opcode #{opcode} at #{codeOriginString}"
+            lowerDefault
         end
     end
 end

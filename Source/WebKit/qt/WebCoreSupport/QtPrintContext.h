@@ -32,7 +32,7 @@ class GraphicsContext;
 
 class QWebFrameAdapter;
 
-class WEBKIT_EXPORTDATA QtPrintContext {
+class QtPrintContext {
 public:
     QtPrintContext(QPainter*, const QRect& pageRect, QWebFrameAdapter*);
     ~QtPrintContext();

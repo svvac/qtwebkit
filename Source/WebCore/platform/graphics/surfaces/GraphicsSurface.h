@@ -26,8 +26,6 @@
 #include "GraphicsContext3D.h"
 #include "GraphicsSurfaceToken.h"
 #include "IntRect.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -84,7 +82,7 @@ public:
     uint32_t swapBuffers();
     GraphicsSurfaceToken exportToken();
     uint32_t getTextureID();
-    PassOwnPtr<GraphicsContext> beginPaint(const IntRect&, LockOptions);
+    std::unique_ptr<GraphicsContext> beginPaint(const IntRect&, LockOptions);
     PassRefPtr<Image> createReadOnlyImage(const IntRect&);
     ~GraphicsSurface();
 
@@ -104,7 +102,7 @@ protected:
     uint32_t platformSwapBuffers();
     IntSize platformSize() const;
 
-    PassOwnPtr<GraphicsContext> platformBeginPaint(const IntSize&, char* bits, int stride);
+    std::unique_ptr<GraphicsContext> platformBeginPaint(const IntSize&, char* bits, int stride);
 
 protected:
     LockOptions m_lockOptions;

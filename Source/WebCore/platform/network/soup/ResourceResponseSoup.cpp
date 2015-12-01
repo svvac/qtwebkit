@@ -19,19 +19,25 @@
  */
 
 #include "config.h"
+
+#if USE(SOUP)
+
 #include "ResourceResponse.h"
 
-#include <wtf/gobject/GOwnPtr.h>
+#include "HTTPHeaderNames.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
-#include "SoupURIUtils.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
-using namespace std;
-
 namespace WebCore {
+
+void ResourceResponse::updateSoupMessageHeaders(SoupMessageHeaders* soupHeaders) const
+{
+    for (const auto& header : httpHeaderFields())
+        soup_message_headers_append(soupHeaders, header.key.utf8().data(), header.value.utf8().data());
+}
 
 SoupMessage* ResourceResponse::toSoupMessage() const
 {
@@ -42,13 +48,7 @@ SoupMessage* ResourceResponse::toSoupMessage() const
 
     soupMessage->status_code = httpStatusCode();
 
-    const HTTPHeaderMap& headers = httpHeaderFields();
-    SoupMessageHeaders* soupHeaders = soupMessage->response_headers;
-    if (!headers.isEmpty()) {
-        HTTPHeaderMap::const_iterator end = headers.end();
-        for (HTTPHeaderMap::const_iterator it = headers.begin(); it != end; ++it)
-            soup_message_headers_append(soupHeaders, it->key.string().utf8().data(), it->value.utf8().data());
-    }
+    updateSoupMessageHeaders(soupMessage->response_headers);
 
     soup_message_set_flags(soupMessage, m_soupFlags);
 
@@ -60,7 +60,7 @@ SoupMessage* ResourceResponse::toSoupMessage() const
 
 void ResourceResponse::updateFromSoupMessage(SoupMessage* soupMessage)
 {
-    m_url = soupURIToKURL(soup_message_get_uri(soupMessage));
+    m_url = URL(soup_message_get_uri(soupMessage));
 
     m_httpStatusCode = soupMessage->status_code;
     setHTTPStatusText(soupMessage->reason_phrase);
@@ -87,7 +87,7 @@ void ResourceResponse::updateFromSoupMessageHeaders(const SoupMessageHeaders* me
 
     soup_message_headers_iter_init(&headersIter, headers);
     while (soup_message_headers_iter_next(&headersIter, &headerName, &headerValue))
-        addHTTPHeaderField(String::fromUTF8WithLatin1Fallback(headerName, strlen(headerName)), String::fromUTF8WithLatin1Fallback(headerValue, strlen(headerValue)));
+        addHTTPHeaderField(String(headerName), String(headerValue));
 
     String contentType;
     const char* officialType = soup_message_headers_get_one(headers, "Content-Type");
@@ -99,6 +99,19 @@ void ResourceResponse::updateFromSoupMessageHeaders(const SoupMessageHeaders* me
     setTextEncodingName(extractCharsetFromMediaType(contentType));
 
     setExpectedContentLength(soup_message_headers_get_content_length(headers));
-    setSuggestedFilename(filenameFromHTTPContentDisposition(httpHeaderField("Content-Disposition")));}
+}
+
+CertificateInfo ResourceResponse::platformCertificateInfo() const
+{
+    return CertificateInfo(m_certificate.get(), m_tlsErrors);
+}
+
+String ResourceResponse::platformSuggestedFilename() const
+{
+    String contentDisposition(httpHeaderField(HTTPHeaderName::ContentDisposition));
+    return filenameFromHTTPContentDisposition(String::fromUTF8WithLatin1Fallback(contentDisposition.characters8(), contentDisposition.length()));
+}
 
 }
+
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Computer, Inc.
+ * Copyright (C) 2007, 2008, 2013 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,13 +21,15 @@
 #include "config.h"
 #include "FontCustomPlatformData.h"
 
+#include "FontDescription.h"
+#include "FontPlatformData.h"
 #include "OpenTypeUtilities.h"
 #include "SharedBuffer.h"
-#include "FontPlatformData.h"
 
 #include <cairo-win32.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/text/Base64.h>
+#include <wtf/win/GDIObject.h>
 
 namespace WebCore {
 
@@ -37,14 +39,17 @@ FontCustomPlatformData::~FontCustomPlatformData()
         RemoveFontMemResourceEx(m_fontReference);
 }
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation, FontWidthVariant, FontRenderingMode renderingMode)
+FontPlatformData FontCustomPlatformData::fontPlatformData(const FontDescription& fontDescription, bool bold, bool italic)
 {
+    int size = fontDescription.computedPixelSize();
+    FontRenderingMode renderingMode = fontDescription.renderingMode();
+
     LOGFONT logFont;
     memset(&logFont, 0, sizeof(LOGFONT));
     wcsncpy(logFont.lfFaceName, m_name.charactersWithNullTermination().data(), LF_FACESIZE - 1);
 
     logFont.lfHeight = -size;
-    if (renderingMode == NormalRenderingMode)
+    if (renderingMode == FontRenderingMode::Normal)
         logFont.lfHeight *= 32;
     logFont.lfWidth = 0;
     logFont.lfEscapement = 0;
@@ -58,11 +63,11 @@ FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, b
     logFont.lfItalic = italic;
     logFont.lfWeight = bold ? 700 : 400;
 
-    HFONT hfont = CreateFontIndirect(&logFont);
+    auto hfont = adoptGDIObject(::CreateFontIndirect(&logFont));
 
-    cairo_font_face_t* fontFace = cairo_win32_font_face_create_for_hfont(hfont);
+    cairo_font_face_t* fontFace = cairo_win32_font_face_create_for_hfont(hfont.get());
 
-    FontPlatformData fontPlatformData(hfont, fontFace, size, bold, italic);
+    FontPlatformData fontPlatformData(WTF::move(hfont), fontFace, size, bold, italic);
 
     cairo_font_face_destroy(fontFace);
 
@@ -79,22 +84,20 @@ static String createUniqueFontName()
     return fontName;
 }
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer)
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer& buffer)
 {
-    ASSERT_ARG(buffer, buffer);
-
     String fontName = createUniqueFontName();
     HANDLE fontReference = renameAndActivateFont(buffer, fontName);
 
     if (!fontReference)
-        return 0;
+        return nullptr;
 
-    return new FontCustomPlatformData(fontReference, fontName);
+    return std::make_unique<FontCustomPlatformData>(fontReference, fontName);
 }
 
 bool FontCustomPlatformData::supportsFormat(const String& format)
 {
-    return equalIgnoringCase(format, "truetype") || equalIgnoringCase(format, "opentype");
+    return equalIgnoringCase(format, "truetype") || equalIgnoringCase(format, "opentype") || equalIgnoringCase(format, "woff");
 }
 
 }

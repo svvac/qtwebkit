@@ -27,6 +27,7 @@
 #define ImageBufferDataQt_h
 
 #include "Image.h"
+#include "GraphicsContext.h"
 
 #include <QImage>
 #include <QPainter>
@@ -41,22 +42,23 @@
 namespace WebCore {
 
 class IntSize;
+class PlatformLayer;
 
 struct ImageBufferDataPrivate {
     virtual ~ImageBufferDataPrivate() { }
     virtual QPaintDevice* paintDevice() = 0;
     virtual QImage toQImage() const = 0;
-    virtual PassRefPtr<Image> image() const = 0;
+    virtual RefPtr<Image> image() const = 0;
     virtual PassRefPtr<Image> copyImage() const = 0;
     virtual bool isAccelerated() const = 0;
     virtual PlatformLayer* platformLayer() = 0;
-    virtual void draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect,
-                      const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, bool useLowQualityScale,
-                      bool ownContext) = 0;
-    virtual void drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                             const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator op,
+    virtual void draw(GraphicsContext& destContext, ColorSpace styleColorSpace, const FloatRect& destRect,
+                          const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, bool useLowQualityScale,
+                          bool ownContext) = 0;
+    virtual void drawPattern(GraphicsContext& destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
+                             const FloatPoint& phase, const FloatSize& spacing, ColorSpace styleColorSpace, CompositeOperator op,
                              const FloatRect& destRect, bool ownContext) = 0;
-    virtual void clip(GraphicsContext* context, const FloatRect& floatRect) const = 0;
+    virtual void clip(GraphicsContext& context, const FloatRect& floatRect) const = 0;
     virtual void platformTransformColorSpace(const Vector<int>& lookUpTable) = 0;
 };
 
@@ -70,6 +72,7 @@ public:
     ~ImageBufferData();
     QPainter* m_painter;
     ImageBufferDataPrivate* m_impl;
+
 protected:
     void initPainter();
 };

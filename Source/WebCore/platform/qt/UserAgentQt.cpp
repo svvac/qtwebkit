@@ -27,7 +27,7 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 #if OS(WINDOWS)
-#include <SystemInfo.h>
+#include <win/SystemInfo.h>
 #endif // OS(WINDOWS)
 
 namespace WebCore {

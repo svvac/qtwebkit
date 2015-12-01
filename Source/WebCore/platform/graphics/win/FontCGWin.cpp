@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009 Apple Inc.  All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -24,14 +24,14 @@
  */
 
 #include "config.h"
-#include "Font.h"
+#include "FontCascade.h"
 
 #include "AffineTransform.h"
 #include "FloatConversion.h"
+#include "Font.h"
 #include "GlyphBuffer.h"
 #include "GraphicsContext.h"
 #include "IntRect.h"
-#include "SimpleFontData.h"
 #include "UniscribeController.h"
 #include "WebCoreTextRenderer.h"
 #include <ApplicationServices/ApplicationServices.h>
@@ -127,25 +127,25 @@ static CGPathRef createPathForGlyph(HDC hdc, Glyph glyph)
     return path;
 }
 
-void Font::drawGlyphs(GraphicsContext* graphicsContext, const SimpleFontData* font, const GlyphBuffer& glyphBuffer, 
-                      int from, int numGlyphs, const FloatPoint& point) const
+void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font, const GlyphBuffer& glyphBuffer,
+    int from, int numGlyphs, const FloatPoint& point) const
 {
-    CGContextRef cgContext = graphicsContext->platformContext();
+    CGContextRef cgContext = graphicsContext.platformContext();
     bool shouldUseFontSmoothing = WebCoreShouldUseFontSmoothing();
 
     switch(fontDescription().fontSmoothing()) {
     case Antialiased: {
-        graphicsContext->setShouldAntialias(true);
+        graphicsContext.setShouldAntialias(true);
         shouldUseFontSmoothing = false;
         break;
     }
     case SubpixelAntialiased: {
-        graphicsContext->setShouldAntialias(true);
+        graphicsContext.setShouldAntialias(true);
         shouldUseFontSmoothing = true;
         break;
     }
     case NoSmoothing: {
-        graphicsContext->setShouldAntialias(false);
+        graphicsContext.setShouldAntialias(false);
         shouldUseFontSmoothing = false;
         break;
     }
@@ -159,7 +159,7 @@ void Font::drawGlyphs(GraphicsContext* graphicsContext, const SimpleFontData* fo
 
     uint32_t oldFontSmoothingStyle = wkSetFontSmoothingStyle(cgContext, shouldUseFontSmoothing);
 
-    const FontPlatformData& platformData = font->platformData();
+    const FontPlatformData& platformData = font.platformData();
 
     CGContextSetFont(cgContext, platformData.cgFont());
 
@@ -178,42 +178,43 @@ void Font::drawGlyphs(GraphicsContext* graphicsContext, const SimpleFontData* fo
     FloatSize translation = glyphBuffer.offsetAt(from);
 
     CGContextSetFontSize(cgContext, platformData.size());
-    wkSetCGContextFontRenderingStyle(cgContext, font->isSystemFont(), false, font->platformData().useGDI());
+    wkSetCGContextFontRenderingStyle(cgContext, font.isSystemFont(), false, font.platformData().useGDI());
 
     FloatSize shadowOffset;
     float shadowBlur;
     Color shadowColor;
     ColorSpace shadowColorSpace;
-    graphicsContext->getShadow(shadowOffset, shadowBlur, shadowColor, shadowColorSpace);
+    graphicsContext.getShadow(shadowOffset, shadowBlur, shadowColor, shadowColorSpace);
 
-    bool hasSimpleShadow = graphicsContext->textDrawingMode() == TextModeFill && shadowColor.isValid() && !shadowBlur && (!graphicsContext->shadowsIgnoreTransforms() || graphicsContext->getCTM().isIdentityOrTranslationOrFlipped());
+    bool hasSimpleShadow = graphicsContext.textDrawingMode() == TextModeFill && shadowColor.isValid() && !shadowBlur && (!graphicsContext.shadowsIgnoreTransforms() || graphicsContext.getCTM().isIdentityOrTranslationOrFlipped());
     if (hasSimpleShadow) {
         // Paint simple shadows ourselves instead of relying on CG shadows, to avoid losing subpixel antialiasing.
-        graphicsContext->clearShadow();
-        Color fillColor = graphicsContext->fillColor();
+        graphicsContext.clearShadow();
+        Color fillColor = graphicsContext.fillColor();
+        ColorSpace fillColorSpace = graphicsContext.fillColorSpace();
         Color shadowFillColor(shadowColor.red(), shadowColor.green(), shadowColor.blue(), shadowColor.alpha() * fillColor.alpha() / 255);
-        graphicsContext->setFillColor(shadowFillColor, ColorSpaceDeviceRGB);
+        graphicsContext.setFillColor(shadowFillColor, shadowColorSpace);
         float shadowTextX = point.x() + translation.width() + shadowOffset.width();
         // If shadows are ignoring transforms, then we haven't applied the Y coordinate flip yet, so down is negative.
-        float shadowTextY = point.y() + translation.height() + shadowOffset.height() * (graphicsContext->shadowsIgnoreTransforms() ? -1 : 1);
+        float shadowTextY = point.y() + translation.height() + shadowOffset.height() * (graphicsContext.shadowsIgnoreTransforms() ? -1 : 1);
         CGContextSetTextPosition(cgContext, shadowTextX, shadowTextY);
         CGContextShowGlyphsWithAdvances(cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
-        if (font->syntheticBoldOffset()) {
-            CGContextSetTextPosition(cgContext, point.x() + translation.width() + shadowOffset.width() + font->syntheticBoldOffset(), point.y() + translation.height() + shadowOffset.height());
+        if (font.syntheticBoldOffset()) {
+            CGContextSetTextPosition(cgContext, point.x() + translation.width() + shadowOffset.width() + font.syntheticBoldOffset(), point.y() + translation.height() + shadowOffset.height());
             CGContextShowGlyphsWithAdvances(cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
         }
-        graphicsContext->setFillColor(fillColor, ColorSpaceDeviceRGB);
+        graphicsContext.setFillColor(fillColor, fillColorSpace);
     }
 
     CGContextSetTextPosition(cgContext, point.x() + translation.width(), point.y() + translation.height());
     CGContextShowGlyphsWithAdvances(cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
-    if (font->syntheticBoldOffset()) {
-        CGContextSetTextPosition(cgContext, point.x() + translation.width() + font->syntheticBoldOffset(), point.y() + translation.height());
+    if (font.syntheticBoldOffset()) {
+        CGContextSetTextPosition(cgContext, point.x() + translation.width() + font.syntheticBoldOffset(), point.y() + translation.height());
         CGContextShowGlyphsWithAdvances(cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
     }
 
     if (hasSimpleShadow)
-        graphicsContext->setShadow(shadowOffset, shadowBlur, shadowColor, ColorSpaceDeviceRGB);
+        graphicsContext.setShadow(shadowOffset, shadowBlur, shadowColor, shadowColorSpace);
 
     wkRestoreFontSmoothingStyle(cgContext, oldFontSmoothingStyle);
 }

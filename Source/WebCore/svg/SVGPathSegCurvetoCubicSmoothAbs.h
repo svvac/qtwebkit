@@ -22,16 +22,15 @@
 #ifndef SVGPathSegCurvetoCubicSmoothAbs_h
 #define SVGPathSegCurvetoCubicSmoothAbs_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegCurvetoCubicSmooth.h"
 
 namespace WebCore {
 
 class SVGPathSegCurvetoCubicSmoothAbs : public SVGPathSegCurvetoCubicSmooth {
 public:
-    static PassRefPtr<SVGPathSegCurvetoCubicSmoothAbs> create(SVGPathElement* element, SVGPathSegRole role, float x, float y, float x2, float y2)
+    static Ref<SVGPathSegCurvetoCubicSmoothAbs> create(SVGPathElement* element, SVGPathSegRole role, float x, float y, float x2, float y2)
     {
-        return adoptRef(new SVGPathSegCurvetoCubicSmoothAbs(element, role, x, y, x2, y2));
+        return adoptRef(*new SVGPathSegCurvetoCubicSmoothAbs(element, role, x, y, x2, y2));
     }
 
 private:
@@ -40,11 +39,10 @@ private:
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_CURVETO_CUBIC_SMOOTH_ABS; }
-    virtual String pathSegTypeAsLetter() const { return "S"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_CURVETO_CUBIC_SMOOTH_ABS; }
+    virtual String pathSegTypeAsLetter() const override { return "S"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

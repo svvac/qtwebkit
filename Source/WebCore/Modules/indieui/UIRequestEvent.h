@@ -41,10 +41,10 @@ struct UIRequestEventInit : public UIEventInit {
 
 class UIRequestEvent : public UIEvent {
 public:
-    static PassRefPtr<UIRequestEvent> create();
-    static PassRefPtr<UIRequestEvent> create(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView>, int detail, PassRefPtr<EventTarget> receiver);
+    static Ref<UIRequestEvent> create();
+    static Ref<UIRequestEvent> create(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView>, int detail, PassRefPtr<EventTarget> receiver);
     
-    static PassRefPtr<UIRequestEvent> create(const AtomicString& eventType, const UIRequestEventInit&);
+    static Ref<UIRequestEvent> create(const AtomicString& eventType, const UIRequestEventInit&);
     
     virtual ~UIRequestEvent();
     
@@ -57,27 +57,12 @@ protected:
     
     UIRequestEvent();
     
-    const AtomicString& interfaceName() const OVERRIDE;
+    EventInterface eventInterface() const override;
     
 private:
     RefPtr<EventTarget> m_receiver;
 };
 
-class UIRequestEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<UIRequestEventDispatchMediator> create(PassRefPtr<UIRequestEvent> event)
-    {
-        return adoptRef(new UIRequestEventDispatchMediator(event));
-    }
-    
-private:
-    explicit UIRequestEventDispatchMediator(PassRefPtr<UIRequestEvent>);
-    
-    UIRequestEvent* event() const;
-    
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-    
 } // namespace WebCore
 
 #endif // ENABLE(INDIE_UI)

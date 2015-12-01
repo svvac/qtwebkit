@@ -26,12 +26,13 @@
 #ifndef WebCoreAVFResourceLoader_h
 #define WebCoreAVFResourceLoader_h
 
-#if ENABLE(VIDEO) && USE(AVFOUNDATION) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if ENABLE(VIDEO) && USE(AVFOUNDATION) && HAVE(AVFOUNDATION_LOADER_DELEGATE)
 
 #include "CachedRawResourceClient.h"
 #include "CachedResourceHandle.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
 
 OBJC_CLASS AVAssetResourceLoadingRequest;
@@ -42,26 +43,27 @@ class CachedRawResource;
 class CachedResourceLoader;
 class MediaPlayerPrivateAVFoundationObjC;
 
-class WebCoreAVFResourceLoader : public CachedRawResourceClient {
+class WebCoreAVFResourceLoader : public RefCounted<WebCoreAVFResourceLoader>, CachedRawResourceClient {
     WTF_MAKE_NONCOPYABLE(WebCoreAVFResourceLoader); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<WebCoreAVFResourceLoader> create(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest*);
+    static PassRefPtr<WebCoreAVFResourceLoader> create(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest *);
     virtual ~WebCoreAVFResourceLoader();
 
     void startLoading();
     void stopLoading();
+    void invalidate();
 
     CachedRawResource* resource();
 
 private:
     // CachedResourceClient
-    virtual void responseReceived(CachedResource*, const ResourceResponse&) OVERRIDE;
-    virtual void dataReceived(CachedResource*, const char*, int) OVERRIDE;
-    virtual void notifyFinished(CachedResource*) OVERRIDE;
+    virtual void responseReceived(CachedResource*, const ResourceResponse&) override;
+    virtual void dataReceived(CachedResource*, const char*, int) override;
+    virtual void notifyFinished(CachedResource*) override;
 
     void fulfillRequestWithResource(CachedResource*);
 
-    WebCoreAVFResourceLoader(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest*);
+    WebCoreAVFResourceLoader(MediaPlayerPrivateAVFoundationObjC* parent, AVAssetResourceLoadingRequest *);
     MediaPlayerPrivateAVFoundationObjC* m_parent;
     RetainPtr<AVAssetResourceLoadingRequest> m_avRequest;
     CachedResourceHandle<CachedRawResource> m_resource;

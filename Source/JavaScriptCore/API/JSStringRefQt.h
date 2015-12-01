@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006, 2007 Apple Computer, Inc.  All rights reserved.
- * Copyright (C) 2015 The Qt Company Ltd.
+ * Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,6 @@
 @result           A QString containing string.
 */
 JS_EXPORT QString JSStringCopyQString(JSStringRef string);
-JS_EXPORT JSRetainPtr<JSStringRef> JSStringCreateWithQString(const QString&);
+JS_EXPORT JSStringRef JSStringCreateWithQString(const QString&);
 
 #endif /* JSStringRefQt_h */

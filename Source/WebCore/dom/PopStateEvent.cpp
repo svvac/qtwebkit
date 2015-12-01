@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,7 +29,7 @@
 
 #include "EventNames.h"
 #include "History.h"
-#include "SerializedScriptValue.h"
+#include <runtime/JSCInlines.h>
 
 namespace WebCore {
 
@@ -39,16 +39,12 @@ PopStateEventInit::PopStateEventInit()
 
 PopStateEvent::PopStateEvent()
     : Event(eventNames().popstateEvent, false, true)
-    , m_serializedState(0)
-    , m_history(0)
 {
 }
 
 PopStateEvent::PopStateEvent(const AtomicString& type, const PopStateEventInit& initializer)
     : Event(type, initializer)
     , m_state(initializer.state)
-    , m_serializedState(0)
-    , m_history(0)
 {
 }
 
@@ -63,24 +59,36 @@ PopStateEvent::~PopStateEvent()
 {
 }
 
-PassRefPtr<PopStateEvent> PopStateEvent::create()
+Ref<PopStateEvent> PopStateEvent::create()
 {
-    return adoptRef(new PopStateEvent);
+    return adoptRef(*new PopStateEvent);
 }
 
-PassRefPtr<PopStateEvent> PopStateEvent::create(PassRefPtr<SerializedScriptValue> serializedState, PassRefPtr<History> history)
+Ref<PopStateEvent> PopStateEvent::create(PassRefPtr<SerializedScriptValue> serializedState, PassRefPtr<History> history)
 {
-    return adoptRef(new PopStateEvent(serializedState, history));
+    return adoptRef(*new PopStateEvent(serializedState, history));
 }
 
-PassRefPtr<PopStateEvent> PopStateEvent::create(const AtomicString& type, const PopStateEventInit& initializer)
+Ref<PopStateEvent> PopStateEvent::create(const AtomicString& type, const PopStateEventInit& initializer)
 {
-    return adoptRef(new PopStateEvent(type, initializer));
+    return adoptRef(*new PopStateEvent(type, initializer));
 }
 
-const AtomicString& PopStateEvent::interfaceName() const
+RefPtr<SerializedScriptValue> PopStateEvent::trySerializeState(JSC::ExecState* exec)
 {
-    return eventNames().interfaceForPopStateEvent;
+    ASSERT(!m_state.hasNoValue());
+    
+    if (!m_serializedState && !m_triedToSerialize) {
+        m_serializedState = SerializedScriptValue::create(exec, m_state.jsValue(), nullptr, nullptr, NonThrowing);
+        m_triedToSerialize = true;
+    }
+    
+    return m_serializedState;
+}
+
+EventInterface PopStateEvent::eventInterface() const
+{
+    return PopStateEventInterfaceType;
 }
 
 } // namespace WebCore

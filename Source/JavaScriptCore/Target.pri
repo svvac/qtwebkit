@@ -36,7 +36,9 @@ SOURCES += \
     API/JSCallbackObject.cpp \
     API/JSClassRef.cpp \
     API/JSContextRef.cpp \
+    API/JSCTestRunnerUtils.cpp \
     API/JSObjectRef.cpp \
+    API/JSProfilerPrivate.cpp \
     API/JSScriptRef.cpp \
     API/JSStringRef.cpp \
     API/JSStringRefQt.cpp \
@@ -44,287 +46,642 @@ SOURCES += \
     API/JSWeakObjectMapRefPrivate.cpp \
     API/OpaqueJSString.cpp \
     assembler/ARMAssembler.cpp \
-    assembler/ARMv7Assembler.cpp \
     assembler/LinkBuffer.cpp \
     assembler/MacroAssembler.cpp \
     assembler/MacroAssemblerARM.cpp \
+    assembler/MacroAssemblerARM64.cpp \
+    assembler/MacroAssemblerARMv7.cpp \
+    assembler/MacroAssemblerPrinter.cpp \
+    assembler/MacroAssemblerX86Common.cpp \
+    bindings/ScriptFunctionCall.cpp \
+    bindings/ScriptObject.cpp \
+    bindings/ScriptValue.cpp \
+    builtins/BuiltinExecutables.cpp \
     bytecode/ArrayAllocationProfile.cpp \
     bytecode/ArrayProfile.cpp \
+    bytecode/BytecodeBasicBlock.cpp \
+    bytecode/BytecodeIntrinsicRegistry.cpp \
+    bytecode/BytecodeLivenessAnalysis.cpp \
+    bytecode/CallEdge.cpp \
     bytecode/CallLinkInfo.cpp \
     bytecode/CallLinkStatus.cpp \
+    bytecode/CallMode.cpp \
+    bytecode/CallVariant.cpp \
     bytecode/CodeBlock.cpp \
     bytecode/CodeBlockHash.cpp \
+    bytecode/CodeBlockJettisoningWatchpoint.cpp \
     bytecode/CodeOrigin.cpp \
     bytecode/CodeType.cpp \
+    bytecode/ComplexGetStatus.cpp \
+    bytecode/DataFormat.cpp \
+    bytecode/DeferredCompilationCallback.cpp \
+    bytecode/DeferredSourceDump.cpp \
     bytecode/DFGExitProfile.cpp \
     bytecode/ExecutionCounter.cpp \
+    bytecode/ExitingJITType.cpp \
     bytecode/ExitKind.cpp \
     bytecode/GetByIdStatus.cpp \
+    bytecode/GetByIdVariant.cpp \
+    bytecode/InlineCallFrame.cpp \
+    bytecode/InlineCallFrameSet.cpp \
     bytecode/JumpTable.cpp \
     bytecode/LazyOperandValueProfile.cpp \
     bytecode/MethodOfGettingAValueProfile.cpp \
+    bytecode/ObjectPropertyCondition.cpp \
+    bytecode/ObjectPropertyConditionSet.cpp \
     bytecode/Opcode.cpp \
-    bytecode/PolymorphicPutByIdList.cpp \
+    bytecode/PolymorphicAccess.cpp \
     bytecode/PreciseJumpTargets.cpp \
+    bytecode/PropertyCondition.cpp \
+    bytecode/PutByIdFlags.cpp \
     bytecode/PutByIdStatus.cpp \
+    bytecode/PutByIdVariant.cpp \
     bytecode/ReduceWhitespace.cpp \
-    bytecode/ResolveGlobalStatus.cpp \
     bytecode/SamplingTool.cpp \
     bytecode/SpecialPointer.cpp \
     bytecode/SpeculatedType.cpp \
+    bytecode/StructureSet.cpp \
     bytecode/StructureStubClearingWatchpoint.cpp \
     bytecode/StructureStubInfo.cpp \
+    bytecode/ToThisStatus.cpp \
+    bytecode/TrackedReferences.cpp \
     bytecode/UnlinkedCodeBlock.cpp \
+    bytecode/UnlinkedFunctionExecutable.cpp \
+    bytecode/UnlinkedInstructionStream.cpp \
+    bytecode/ValueRecovery.cpp \
+    bytecode/VariableWriteFireDetail.cpp \
+    bytecode/VirtualRegister.cpp \
     bytecode/Watchpoint.cpp \
     bytecompiler/BytecodeGenerator.cpp \
     bytecompiler/NodesCodegen.cpp \
+    ftl/FTLAbstractHeap.cpp \
+    ftl/FTLAbstractHeapRepository.cpp \
+    ftl/FTLAvailableRecovery.cpp \
+    ftl/FTLCapabilities.cpp \
+    ftl/FTLCommonValues.cpp \
+    ftl/FTLCompile.cpp \
+    ftl/FTLDataSection.cpp \
+    ftl/FTLDWARFDebugLineInfo.cpp \
+    ftl/FTLDWARFRegister.cpp \
+    ftl/FTLExitArgument.cpp \
+    ftl/FTLExitArgumentForOperand.cpp \
+    ftl/FTLExitPropertyValue.cpp \
+    ftl/FTLExitThunkGenerator.cpp \
+    ftl/FTLExitTimeObjectMaterialization.cpp \
+    ftl/FTLExitValue.cpp \
+    ftl/FTLFail.cpp \
+    ftl/FTLForOSREntryJITCode.cpp \
+    ftl/FTLInlineCacheSize.cpp \
+    ftl/FTLIntrinsicRepository.cpp \
+    ftl/FTLJITCode.cpp \
+    ftl/FTLJITFinalizer.cpp \
+    ftl/FTLJSCall.cpp \
+    ftl/FTLJSCallBase.cpp \
+    ftl/FTLJSCallVarargs.cpp \
+    ftl/FTLJSTailCall.cpp \
+    ftl/FTLLazySlowPath.cpp \
+    ftl/FTLLink.cpp \
+    ftl/FTLLocation.cpp \
+    ftl/FTLLowerDFGToLLVM.cpp \
+    ftl/FTLOperations.cpp \
+    ftl/FTLOSREntry.cpp \
+    ftl/FTLOSRExit.cpp \
+    ftl/FTLOSRExitCompiler.cpp \
+    ftl/FTLOutput.cpp \
+    ftl/FTLRecoveryOpcode.cpp \
+    ftl/FTLSaveRestore.cpp \
+    ftl/FTLSlowPathCall.cpp \
+    ftl/FTLSlowPathCallKey.cpp \
+    ftl/FTLStackMaps.cpp \
+    ftl/FTLState.cpp \
+    ftl/FTLThunks.cpp \
+    ftl/FTLUnwindInfo.cpp \
+    ftl/FTLValueRange.cpp \
+    heap/CodeBlockSet.cpp \
+    heap/ConservativeRoots.cpp \
+    heap/CopiedBlock.cpp \
     heap/CopiedSpace.cpp \
     heap/CopyVisitor.cpp \
-    heap/ConservativeRoots.cpp \
-    heap/DFGCodeBlocks.cpp \
+    heap/DeferGC.cpp \
+    heap/EdenGCActivityCallback.cpp \
+    heap/FullGCActivityCallback.cpp \
+    heap/GCActivityCallback.cpp \
+    heap/GCLogging.cpp \
+    heap/HandleSet.cpp \
+    heap/HandleStack.cpp \
+    heap/Heap.cpp \
+    heap/HeapHelperPool.cpp \
+    heap/HeapStatistics.cpp \
+    heap/HeapTimer.cpp \
+    heap/HeapVerifier.cpp \
+    heap/IncrementalSweeper.cpp \
+    heap/JITStubRoutineSet.cpp \
+    heap/LiveObjectList.cpp \
+    heap/MachineStackMarker.cpp \
+    heap/MarkedAllocator.cpp \
+    heap/MarkedBlock.cpp \
+    heap/MarkedSpace.cpp \
+    heap/MarkStack.cpp \
+    heap/SlotVisitor.cpp \
     heap/Weak.cpp \
     heap/WeakBlock.cpp \
     heap/WeakHandleOwner.cpp \
     heap/WeakSet.cpp \
-    heap/HandleSet.cpp \
-    heap/HandleStack.cpp \
-    heap/BlockAllocator.cpp \
-    heap/GCThreadSharedData.cpp \
-    heap/GCThread.cpp \
-    heap/Heap.cpp \
-    heap/HeapStatistics.cpp \
-    heap/HeapTimer.cpp \
-    heap/IncrementalSweeper.cpp \
-    heap/JITStubRoutineSet.cpp \
-    heap/MachineStackMarker.cpp \
-    heap/MarkStack.cpp \
-    heap/MarkedAllocator.cpp \
-    heap/MarkedBlock.cpp \
-    heap/MarkedSpace.cpp \
-    heap/SlotVisitor.cpp \
-    heap/SuperRegion.cpp \
-    heap/VTableSpectrum.cpp \
+    heap/WriteBarrierBuffer.cpp \
     heap/WriteBarrierSupport.cpp \
-    debugger/DebuggerActivation.cpp \
-    debugger/DebuggerCallFrame.cpp \
     debugger/Debugger.cpp \
-    dfg/DFGAbstractState.cpp \
-    dfg/DFGArgumentsSimplificationPhase.cpp \
+    debugger/DebuggerCallFrame.cpp \
+    debugger/DebuggerScope.cpp \
+    dfg/DFGAbstractHeap.cpp \
+    dfg/DFGAbstractValue.cpp \
+    dfg/DFGAdaptiveInferredPropertyValueWatchpoint.cpp \
+    dfg/DFGAdaptiveStructureWatchpoint.cpp \
+    dfg/DFGArgumentsEliminationPhase.cpp \
+    dfg/DFGArgumentsUtilities.cpp \
+    dfg/DFGArithMode.cpp \
     dfg/DFGArrayMode.cpp \
-    dfg/DFGAssemblyHelpers.cpp \
+    dfg/DFGAtTailAbstractState.cpp \
+    dfg/DFGAvailability.cpp \
+    dfg/DFGAvailabilityMap.cpp \
     dfg/DFGBackwardsPropagationPhase.cpp \
+    dfg/DFGBasicBlock.cpp \
+    dfg/DFGBlockInsertionSet.cpp \
+    dfg/DFGBlockSet.cpp \
     dfg/DFGByteCodeParser.cpp \
     dfg/DFGCapabilities.cpp \
-    dfg/DFGCommon.cpp \
     dfg/DFGCFAPhase.cpp \
     dfg/DFGCFGSimplificationPhase.cpp \
-    dfg/DFGCPSRethreadingPhase.cpp \
+    dfg/DFGCleanUpPhase.cpp \
+    dfg/DFGClobberize.cpp \
+    dfg/DFGClobberSet.cpp \
+    dfg/DFGClobbersExitState.cpp \
+    dfg/DFGCombinedLiveness.cpp \
+    dfg/DFGCommon.cpp \
+    dfg/DFGCommonData.cpp \
+    dfg/DFGCompilationKey.cpp \
+    dfg/DFGCompilationMode.cpp \
     dfg/DFGConstantFoldingPhase.cpp \
+    dfg/DFGConstantHoistingPhase.cpp \
+    dfg/DFGCopyBarrierOptimizationPhase.cpp \
+    dfg/DFGCPSRethreadingPhase.cpp \
+    dfg/DFGCriticalEdgeBreakingPhase.cpp \
     dfg/DFGCSEPhase.cpp \
     dfg/DFGDCEPhase.cpp \
+    dfg/DFGDesiredIdentifiers.cpp \
+    dfg/DFGDesiredTransitions.cpp \
+    dfg/DFGDesiredWatchpoints.cpp \
+    dfg/DFGDesiredWeakReferences.cpp \
     dfg/DFGDisassembler.cpp \
-    dfg/DFGDominators.cpp \
+    dfg/DFGDoesGC.cpp \
     dfg/DFGDriver.cpp \
     dfg/DFGEdge.cpp \
+    dfg/DFGEpoch.cpp \
+    dfg/DFGFailedFinalizer.cpp \
+    dfg/DFGFinalizer.cpp \
     dfg/DFGFixupPhase.cpp \
+    dfg/DFGFlushedAt.cpp \
+    dfg/DFGFlushFormat.cpp \
+    dfg/DFGFrozenValue.cpp \
+    dfg/DFGFunctionWhitelist.cpp \
     dfg/DFGGraph.cpp \
+    dfg/DFGGraphSafepoint.cpp \
+    dfg/DFGHeapLocation.cpp \
+    dfg/DFGInferredTypeCheck.cpp \
+    dfg/DFGInPlaceAbstractState.cpp \
+    dfg/DFGInsertionSet.cpp \
+    dfg/DFGIntegerCheckCombiningPhase.cpp \
+    dfg/DFGIntegerRangeOptimizationPhase.cpp \
+    dfg/DFGInvalidationPointInjectionPhase.cpp \
+    dfg/DFGJITCode.cpp \
     dfg/DFGJITCompiler.cpp \
+    dfg/DFGJITFinalizer.cpp \
+    dfg/DFGJumpReplacement.cpp \
+    dfg/DFGLazyJSValue.cpp \
+    dfg/DFGLazyNode.cpp \
+    dfg/DFGLICMPhase.cpp \
+    dfg/DFGLiveCatchVariablePreservationPhase.cpp \
+    dfg/DFGLivenessAnalysisPhase.cpp \
     dfg/DFGLongLivedState.cpp \
+    dfg/DFGLoopPreHeaderCreationPhase.cpp \
+    dfg/DFGMaximalFlushInsertionPhase.cpp \
+    dfg/DFGMayExit.cpp \
+    dfg/DFGMinifiedGraph.cpp \
     dfg/DFGMinifiedNode.cpp \
+    dfg/DFGMovHintRemovalPhase.cpp \
+    dfg/DFGMultiGetByOffsetData.cpp \
+    dfg/DFGNaturalLoops.cpp \
     dfg/DFGNode.cpp \
     dfg/DFGNodeFlags.cpp \
+    dfg/DFGNodeOrigin.cpp \
+    dfg/DFGObjectAllocationSinkingPhase.cpp \
+    dfg/DFGObjectMaterializationData.cpp \
     dfg/DFGOperations.cpp \
+    dfg/DFGOSRAvailabilityAnalysisPhase.cpp \
     dfg/DFGOSREntry.cpp \
+    dfg/DFGOSREntrypointCreationPhase.cpp \
     dfg/DFGOSRExit.cpp \
+    dfg/DFGOSRExitBase.cpp \
     dfg/DFGOSRExitCompiler.cpp \
-    dfg/DFGOSRExitCompiler64.cpp \
     dfg/DFGOSRExitCompiler32_64.cpp \
+    dfg/DFGOSRExitCompiler64.cpp \
+    dfg/DFGOSRExitCompilerCommon.cpp \
+    dfg/DFGOSRExitFuzz.cpp \
     dfg/DFGOSRExitJumpPlaceholder.cpp \
+    dfg/DFGOSRExitPreparation.cpp \
+    dfg/DFGPhantomInsertionPhase.cpp \
     dfg/DFGPhase.cpp \
-    dfg/DFGPredictionPropagationPhase.cpp \
+    dfg/DFGPhiChildren.cpp \
+    dfg/DFGPlan.cpp \
     dfg/DFGPredictionInjectionPhase.cpp \
-    dfg/DFGRepatch.cpp \
+    dfg/DFGPredictionPropagationPhase.cpp \
+    dfg/DFGPrePostNumbering.cpp \
+    dfg/DFGPromotedHeapLocation.cpp \
+    dfg/DFGPureValue.cpp \
+    dfg/DFGPutStackSinkingPhase.cpp \
+    dfg/DFGSafepoint.cpp \
     dfg/DFGSpeculativeJIT.cpp \
     dfg/DFGSpeculativeJIT32_64.cpp \
     dfg/DFGSpeculativeJIT64.cpp \
-    dfg/DFGTypeCheckHoistingPhase.cpp \
+    dfg/DFGSSACalculator.cpp \
+    dfg/DFGSSAConversionPhase.cpp \
+    dfg/DFGSSALoweringPhase.cpp \
+    dfg/DFGStackLayoutPhase.cpp \
+    dfg/DFGStaticExecutionCountEstimationPhase.cpp \
+    dfg/DFGStoreBarrierInsertionPhase.cpp \
+    dfg/DFGStrengthReductionPhase.cpp \
+    dfg/DFGStructureAbstractValue.cpp \
+    dfg/DFGStructureRegistrationPhase.cpp \
+    dfg/DFGThreadData.cpp \
     dfg/DFGThunks.cpp \
+    dfg/DFGTierUpCheckInjectionPhase.cpp \
+    dfg/DFGToFTLDeferredCompilationCallback.cpp \
+    dfg/DFGToFTLForOSREntryDeferredCompilationCallback.cpp \
+    dfg/DFGTransition.cpp \
+    dfg/DFGTypeCheckHoistingPhase.cpp \
     dfg/DFGUnificationPhase.cpp \
     dfg/DFGUseKind.cpp \
+    dfg/DFGValidate.cpp \
     dfg/DFGValueSource.cpp \
+    dfg/DFGValueStrength.cpp \
+    dfg/DFGVarargsForwardingPhase.cpp \
+    dfg/DFGVariableAccessData.cpp \
     dfg/DFGVariableAccessDataDump.cpp \
     dfg/DFGVariableEvent.cpp \
     dfg/DFGVariableEventStream.cpp \
-    dfg/DFGValidate.cpp \
     dfg/DFGVirtualRegisterAllocationPhase.cpp \
+    dfg/DFGWatchpointCollectionPhase.cpp \
+    dfg/DFGWorklist.cpp \
     disassembler/Disassembler.cpp \
+    disassembler/LLVMDisassembler.cpp \
+    disassembler/X86Disassembler.cpp \
+    generated/JSCBuiltins.cpp \
+    generated/inspector/InspectorBackendDispatchers.cpp \
+    generated/inspector/InspectorFrontendDispatchers.cpp \
+    generated/inspector/InspectorProtocolObjects.cpp \
+    inspector/ConsoleMessage.cpp \
+    inspector/ContentSearchUtilities.cpp \
+    inspector/EventLoop.cpp \
+    inspector/IdentifiersFactory.cpp \
+    inspector/InjectedScript.cpp \
+    inspector/InjectedScriptBase.cpp \
+    inspector/InjectedScriptHost.cpp \
+    inspector/InjectedScriptManager.cpp \
+    inspector/InjectedScriptModule.cpp \
+    inspector/InspectorAgentRegistry.cpp \
+    inspector/InspectorBackendDispatcher.cpp \
+    inspector/InspectorFrontendRouter.cpp \
+    inspector/InspectorValues.cpp \
+    inspector/JavaScriptCallFrame.cpp \
+    inspector/JSGlobalObjectConsoleClient.cpp \
+    inspector/JSGlobalObjectInspectorController.cpp \
+    inspector/JSGlobalObjectScriptDebugServer.cpp \
+    inspector/JSInjectedScriptHost.cpp \
+    inspector/JSInjectedScriptHostPrototype.cpp \
+    inspector/JSJavaScriptCallFrame.cpp \
+    inspector/JSJavaScriptCallFramePrototype.cpp \
+    inspector/ScriptArguments.cpp \
+    inspector/ScriptCallFrame.cpp \
+    inspector/ScriptCallStack.cpp \
+    inspector/ScriptCallStackFactory.cpp \
+    inspector/ScriptDebugServer.cpp \
+    inspector/agents/InspectorAgent.cpp \
+    inspector/agents/InspectorConsoleAgent.cpp \
+    inspector/agents/InspectorDebuggerAgent.cpp \
+    inspector/agents/InspectorHeapAgent.cpp \
+    inspector/agents/InspectorRuntimeAgent.cpp \
+    inspector/agents/JSGlobalObjectConsoleAgent.cpp \
+    inspector/agents/JSGlobalObjectDebuggerAgent.cpp \
+    inspector/agents/JSGlobalObjectRuntimeAgent.cpp \
+    #inspector/remote/RemoteInspectorDebuggable.cpp \
     interpreter/AbstractPC.cpp \
     interpreter/CallFrame.cpp \
     interpreter/Interpreter.cpp \
     interpreter/JSStack.cpp \
-    jit/ClosureCallStubRoutine.cpp \
-    jit/ExecutableAllocatorFixedVMPool.cpp \
+    interpreter/ProtoCallFrame.cpp \
+    interpreter/StackVisitor.cpp \
+    jit/AssemblyHelpers.cpp \
+    jit/BinarySwitch.cpp \
+    jit/CachedRecovery.cpp \
+    jit/CallFrameShuffleData.cpp \
+    jit/CallFrameShuffler.cpp \
+    jit/CallFrameShuffler32_64.cpp \
+    jit/CallFrameShuffler64.cpp \
+    jit/ExecutableAllocationFuzz.cpp \
     jit/ExecutableAllocator.cpp \
-    jit/HostCallReturnValue.cpp \
+    jit/ExecutableAllocatorFixedVMPool.cpp \
     jit/GCAwareJITStubRoutine.cpp \
+    jit/HostCallReturnValue.cpp \
+    jit/IntrinsicEmitter.cpp \
+    jit/JIT.cpp \
+    jit/JITAddGenerator.cpp \
     jit/JITArithmetic.cpp \
     jit/JITArithmetic32_64.cpp \
     jit/JITCall.cpp \
     jit/JITCall32_64.cpp \
     jit/JITCode.cpp \
-    jit/JIT.cpp \
     jit/JITDisassembler.cpp \
     jit/JITExceptions.cpp \
+    jit/JITInlineCacheGenerator.cpp \
     jit/JITOpcodes.cpp \
     jit/JITOpcodes32_64.cpp \
+    jit/JITOperations.cpp \
+    jit/JITOperationsMSVC64.cpp \
     jit/JITPropertyAccess.cpp \
     jit/JITPropertyAccess32_64.cpp \
     jit/JITStubRoutine.cpp \
-    jit/JITStubs.cpp \
+    jit/JITSubGenerator.cpp \
     jit/JITThunks.cpp \
-    jit/JumpReplacementWatchpoint.cpp \
+    jit/JITToDFGDeferredCompilationCallback.cpp \
+    jit/PolymorphicCallStubRoutine.cpp \
+    jit/Reg.cpp \
+    jit/RegisterAtOffset.cpp \
+    jit/RegisterAtOffsetList.cpp \
+    jit/RegisterSet.cpp \
+    jit/Repatch.cpp \
+    jit/ScratchRegisterAllocator.cpp \
+    jit/SetupVarargsFrame.cpp \
+    jit/TempRegisterSet.cpp \
     jit/ThunkGenerators.cpp \
     llint/LLIntCLoop.cpp \
     llint/LLIntData.cpp \
-    llint/LLIntEntrypoints.cpp \
+    llint/LLIntEntrypoint.cpp \
     llint/LLIntExceptions.cpp \
+    llint/LLIntOffsetsExtractor.cpp \
     llint/LLIntSlowPaths.cpp \
     llint/LLIntThunks.cpp \
     llint/LowLevelInterpreter.cpp \
     parser/Lexer.cpp \
+    parser/ModuleAnalyzer.cpp \
     parser/Nodes.cpp \
-    parser/ParserArena.cpp \
+    parser/NodesAnalyzeModule.cpp \
     parser/Parser.cpp \
+    parser/ParserArena.cpp \
+    parser/SourceCode.cpp \
     parser/SourceProvider.cpp \
     parser/SourceProviderCache.cpp \
-    profiler/ProfilerBytecode.cpp \
-    profiler/ProfilerBytecode.h \
-    profiler/ProfilerBytecodeSequence.cpp \
-    profiler/ProfilerBytecodes.cpp \
-    profiler/ProfilerBytecodes.h \
-    profiler/ProfilerCompilation.cpp \
-    profiler/ProfilerCompilation.h \
-    profiler/ProfilerCompilationKind.cpp \
-    profiler/ProfilerCompilationKind.h \
-    profiler/ProfilerCompiledBytecode.cpp \
-    profiler/ProfilerCompiledBytecode.h \
-    profiler/ProfilerDatabase.cpp \
-    profiler/ProfilerDatabase.h \
-    profiler/ProfilerExecutionCounter.h \
-    profiler/ProfilerOrigin.cpp \
-    profiler/ProfilerOrigin.h \
-    profiler/ProfilerOriginStack.cpp \
-    profiler/ProfilerOriginStack.h \
-    profiler/ProfilerOSRExit.cpp \
-    profiler/ProfilerOSRExitSite.cpp \
-    profiler/ProfilerProfiledBytecodes.cpp \
+    parser/VariableEnvironment.cpp \
+    profiler/LegacyProfiler.cpp \
     profiler/Profile.cpp \
     profiler/ProfileGenerator.cpp \
     profiler/ProfileNode.cpp \
-    profiler/LegacyProfiler.cpp \
+    profiler/ProfilerBytecode.cpp \
+    profiler/ProfilerBytecodes.cpp \
+    profiler/ProfilerBytecodeSequence.cpp \
+    profiler/ProfilerCompilation.cpp \
+    profiler/ProfilerCompilationKind.cpp \
+    profiler/ProfilerCompiledBytecode.cpp \
+    profiler/ProfilerDatabase.cpp \
+    profiler/ProfilerJettisonReason.cpp \
+    profiler/ProfilerOrigin.cpp \
+    profiler/ProfilerOriginStack.cpp \
+    profiler/ProfilerOSRExit.cpp \
+    profiler/ProfilerOSRExitSite.cpp \
+    profiler/ProfilerProfiledBytecodes.cpp \
     runtime/ArgList.cpp \
-    runtime/Arguments.cpp \
+    runtime/ArrayBuffer.cpp \
+    runtime/ArrayBufferNeuteringWatchpoint.cpp \
+    runtime/ArrayBufferView.cpp \
     runtime/ArrayConstructor.cpp \
+    runtime/ArrayIteratorPrototype.cpp \
     runtime/ArrayPrototype.cpp \
+    runtime/BasicBlockLocation.cpp \
     runtime/BooleanConstructor.cpp \
     runtime/BooleanObject.cpp \
     runtime/BooleanPrototype.cpp \
     runtime/CallData.cpp \
+    runtime/ClonedArguments.cpp \
     runtime/CodeCache.cpp \
     runtime/CodeSpecializationKind.cpp \
     runtime/CommonIdentifiers.cpp \
+    runtime/CommonSlowPaths.cpp \
+    runtime/CommonSlowPathsExceptions.cpp \
+    runtime/CompilationResult.cpp \
     runtime/Completion.cpp \
+    runtime/ConsoleClient.cpp \
+    runtime/ConsolePrototype.cpp \
+    runtime/ConstantMode.cpp \
     runtime/ConstructData.cpp \
+    runtime/ControlFlowProfiler.cpp \
+    runtime/CustomGetterSetter.cpp \
+    runtime/DataView.cpp \
     runtime/DateConstructor.cpp \
     runtime/DateConversion.cpp \
     runtime/DateInstance.cpp \
     runtime/DatePrototype.cpp \
-    runtime/ErrorConstructor.cpp \
+    runtime/DirectArguments.cpp \
+    runtime/DirectArgumentsOffset.cpp \
+    runtime/DumpContext.cpp \
     runtime/Error.cpp \
+    runtime/ErrorConstructor.cpp \
+    runtime/ErrorHandlingScope.cpp \
     runtime/ErrorInstance.cpp \
     runtime/ErrorPrototype.cpp \
+    runtime/Exception.cpp \
+    runtime/ExceptionFuzz.cpp \
     runtime/ExceptionHelpers.cpp \
     runtime/Executable.cpp \
     runtime/FunctionConstructor.cpp \
     runtime/FunctionExecutableDump.cpp \
+    runtime/FunctionHasExecutedCache.cpp \
     runtime/FunctionPrototype.cpp \
-    runtime/GCActivityCallback.cpp \
+    runtime/FunctionRareData.cpp \
     runtime/GetterSetter.cpp \
-    runtime/Options.cpp \
     runtime/Identifier.cpp \
     runtime/IndexingType.cpp \
+    runtime/InferredType.cpp \
+    runtime/InferredTypeTable.cpp \
+    runtime/InferredValue.cpp \
     runtime/InitializeThreading.cpp \
+    runtime/InspectorInstrumentationObject.cpp \
     runtime/InternalFunction.cpp \
-    runtime/JSActivation.cpp \
+    runtime/IntlCollator.cpp \
+    runtime/IntlCollatorConstructor.cpp \
+    runtime/IntlCollatorPrototype.cpp \
+    runtime/IntlDateTimeFormat.cpp \
+    runtime/IntlDateTimeFormatConstructor.cpp \
+    runtime/IntlDateTimeFormatPrototype.cpp \
+    runtime/IntlNumberFormat.cpp \
+    runtime/IntlNumberFormatConstructor.cpp \
+    runtime/IntlNumberFormatPrototype.cpp \
+    runtime/IntlObject.cpp \
+    runtime/IteratorOperations.cpp \
+    runtime/IteratorPrototype.cpp \
     runtime/JSAPIValueWrapper.cpp \
     runtime/JSArray.cpp \
-    runtime/JSCell.cpp \
-    runtime/JSDateMath.cpp \
-    runtime/JSFunction.cpp \
+    runtime/JSArrayBuffer.cpp \
+    runtime/JSArrayBufferConstructor.cpp \
+    runtime/JSArrayBufferPrototype.cpp \
+    runtime/JSArrayBufferView.cpp \
+    runtime/JSArrayIterator.cpp \
+    runtime/JSArrowFunction.cpp \
     runtime/JSBoundFunction.cpp \
-    runtime/VM.cpp \
+    runtime/JSCallee.cpp \
+    runtime/JSCell.cpp \
+    runtime/JSCJSValue.cpp \
+    runtime/JSConsole.cpp \
+    runtime/JSDataView.cpp \
+    runtime/JSDataViewPrototype.cpp \
+    runtime/JSDateMath.cpp \
+    runtime/JSEnvironmentRecord.cpp \
+    runtime/JSFunction.cpp \
+    runtime/JSGlobalLexicalEnvironment.cpp \
     runtime/JSGlobalObject.cpp \
+    runtime/JSGlobalObjectDebuggable.cpp \
     runtime/JSGlobalObjectFunctions.cpp \
-    runtime/JSProxy.cpp \
+    runtime/JSInternalPromise.cpp \
+    runtime/JSInternalPromiseConstructor.cpp \
+    runtime/JSInternalPromiseDeferred.cpp \
+    runtime/JSInternalPromisePrototype.cpp \
+    runtime/JSJob.cpp \
+    runtime/JSLexicalEnvironment.cpp \
     runtime/JSLock.cpp \
+    runtime/JSMap.cpp \
+    runtime/JSMapIterator.cpp \
+    runtime/JSModuleEnvironment.cpp \
+    runtime/JSModuleNamespaceObject.cpp \
+    runtime/JSModuleRecord.cpp \
+    runtime/JSNativeStdFunction.cpp \
     runtime/JSNotAnObject.cpp \
     runtime/JSObject.cpp \
     runtime/JSONObject.cpp \
+    runtime/JSPromise.cpp \
+    runtime/JSPromiseConstructor.cpp \
+    runtime/JSPromiseDeferred.cpp \
+    runtime/JSPromisePrototype.cpp \
+    runtime/JSPropertyNameEnumerator.cpp \
     runtime/JSPropertyNameIterator.cpp \
-    runtime/JSSegmentedVariableObject.cpp \
-    runtime/JSWithScope.cpp \
-    runtime/JSNameScope.cpp \
+    runtime/JSProxy.cpp \
     runtime/JSScope.cpp \
+    runtime/JSSegmentedVariableObject.cpp \
+    runtime/JSSet.cpp \
+    runtime/JSSetIterator.cpp \
     runtime/JSString.cpp \
+    runtime/JSStringIterator.cpp \
     runtime/JSStringJoiner.cpp \
     runtime/JSSymbolTableObject.cpp \
-    runtime/JSCJSValue.cpp \
-    runtime/JSVariableObject.cpp \
+    runtime/JSTemplateRegistryKey.cpp \
+    runtime/JSTypedArrayConstructors.cpp \
+    runtime/JSTypedArrayPrototypes.cpp \
+    runtime/JSTypedArrays.cpp \
+    runtime/JSTypedArrayViewConstructor.cpp \
+    runtime/JSTypedArrayViewPrototype.cpp \
+    runtime/JSWeakMap.cpp \
+    runtime/JSWeakSet.cpp \
+    runtime/JSWithScope.cpp \
     runtime/JSWrapperObject.cpp \
     runtime/LiteralParser.cpp \
     runtime/Lookup.cpp \
+    runtime/MapConstructor.cpp \
+    runtime/MapIteratorPrototype.cpp \
+    runtime/MapPrototype.cpp \
+    runtime/MathCommon.cpp \
     runtime/MathObject.cpp \
     runtime/MemoryStatistics.cpp \
-    runtime/NameConstructor.cpp \
-    runtime/NameInstance.cpp \
-    runtime/NamePrototype.cpp \
+    runtime/ModuleLoaderObject.cpp \
     runtime/NativeErrorConstructor.cpp \
     runtime/NativeErrorPrototype.cpp \
+    runtime/NativeStdFunctionCell.cpp \
+    runtime/NullGetterFunction.cpp \
+    runtime/NullSetterFunction.cpp \
     runtime/NumberConstructor.cpp \
     runtime/NumberObject.cpp \
     runtime/NumberPrototype.cpp \
     runtime/ObjectConstructor.cpp \
     runtime/ObjectPrototype.cpp \
     runtime/Operations.cpp \
+    runtime/Options.cpp \
     runtime/PropertyDescriptor.cpp \
-    runtime/PropertyNameArray.cpp \
     runtime/PropertySlot.cpp \
     runtime/PropertyTable.cpp \
     runtime/PrototypeMap.cpp \
-    runtime/RegExpConstructor.cpp \
-    runtime/RegExpCachedResult.cpp \
-    runtime/RegExpMatchesArray.cpp \
+    runtime/ReflectObject.cpp \
     runtime/RegExp.cpp \
+    runtime/RegExpCache.cpp \
+    runtime/RegExpCachedResult.cpp \
+    runtime/RegExpConstructor.cpp \
+    runtime/RegExpMatchesArray.cpp \
     runtime/RegExpObject.cpp \
     runtime/RegExpPrototype.cpp \
-    runtime/RegExpCache.cpp \
+    runtime/RuntimeType.cpp \
     runtime/SamplingCounter.cpp \
+    runtime/ScopedArguments.cpp \
+    runtime/ScopedArgumentsTable.cpp \
+    runtime/ScopeOffset.cpp \
+    runtime/SetConstructor.cpp \
+    runtime/SetIteratorPrototype.cpp \
+    runtime/SetPrototype.cpp \
+    runtime/SimpleTypedArrayController.cpp \
     runtime/SmallStrings.cpp \
     runtime/SparseArrayValueMap.cpp \
     runtime/StrictEvalActivation.cpp \
     runtime/StringConstructor.cpp \
+    runtime/StringIteratorPrototype.cpp \
     runtime/StringObject.cpp \
     runtime/StringPrototype.cpp \
     runtime/StringRecursionChecker.cpp \
-    runtime/StructureChain.cpp \
     runtime/Structure.cpp \
+    runtime/StructureChain.cpp \
+    runtime/StructureIDTable.cpp \
     runtime/StructureRareData.cpp \
+    runtime/Symbol.cpp \
+    runtime/SymbolConstructor.cpp \
+    runtime/SymbolObject.cpp \
+    runtime/SymbolPrototype.cpp \
     runtime/SymbolTable.cpp \
+    runtime/TemplateRegistry.cpp \
+    runtime/TestRunnerUtils.cpp \
+    runtime/TypedArrayController.cpp \
+    runtime/TypedArrayType.cpp \
+    runtime/TypeLocationCache.cpp \
+    runtime/TypeofType.cpp \
+    runtime/TypeProfiler.cpp \
+    runtime/TypeProfilerLog.cpp \
+    runtime/TypeSet.cpp \
+    runtime/VarOffset.cpp \
+    runtime/VM.cpp \
+    runtime/VMEntryScope.cpp \
     runtime/Watchdog.cpp \
     runtime/WatchdogNone.cpp \
+    runtime/WeakMapConstructor.cpp \
+    runtime/WeakMapData.cpp \
+    runtime/WeakMapPrototype.cpp \
+    runtime/WeakSetConstructor.cpp \
+    runtime/WeakSetPrototype.cpp \
     tools/CodeProfile.cpp \
     tools/CodeProfiling.cpp \
+    tools/FunctionOverrides.cpp \
+    tools/JSDollarVM.cpp \
+    tools/JSDollarVMPrototype.cpp \
+    wasm/JSWASMModule.cpp \
+    wasm/WASMFunctionParser.cpp \
+    wasm/WASMModuleParser.cpp \
+    wasm/WASMReader.cpp \
+    yarr/RegularExpression.cpp \
+    yarr/YarrCanonicalizeUCS2.cpp \
+    yarr/YarrInterpreter.cpp \
     yarr/YarrJIT.cpp \
+    yarr/YarrPattern.cpp \
+    yarr/YarrSyntaxChecker.cpp \
 
 linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
     SOURCES += \
@@ -349,6 +706,23 @@ win32:!mingw:isEqual(QT_ARCH, "x86_64"):{
     QMAKE_EXTRA_COMPILERS += asm_compiler
 
     ASM_SOURCES += jit/JITStubsMSVC64.asm
+}
+
+msvc*: {
+    asm_compiler_llint.commands = ml /c
+    asm_compiler_llint.commands +=  /Fo ${QMAKE_FILE_OUT} ${QMAKE_FILE_IN}
+    asm_compiler_llint.output = ${QMAKE_VAR_OBJECTS_DIR}${QMAKE_FILE_BASE}$${first(QMAKE_EXT_OBJ)}
+    asm_compiler_llint.input = ASM_SOURCES_LINT
+    asm_compiler_llint.variable_out = OBJECTS
+    asm_compiler_llint.name = compiling[asm] ${QMAKE_FILE_IN}
+    silent:asm_compiler_llint.commands = @echo compiling[asm] ${QMAKE_FILE_IN} && $$asm_compiler_llint.commands
+    QMAKE_EXTRA_COMPILERS += asm_compiler_llint
+
+    CONFIG(debug, debug|release): {
+      ASM_SOURCES_LINT += generated/debug$${QMAKE_DIR_SEP}LowLevelInterpreterWin.asm
+    } else {
+      ASM_SOURCES_LINT += generated/release$${QMAKE_DIR_SEP}LowLevelInterpreterWin.asm
+    }
 }
 
 build?(qttestsupport) {

@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,10 +28,11 @@
 #include "config.h"
 #include "PlatformContextCairo.h"
 
+#if USE(CAIRO)
+
 #include "CairoUtilities.h"
 #include "Gradient.h"
 #include "GraphicsContext.h"
-#include "OwnPtrCairo.h"
 #include "Pattern.h"
 #include <cairo.h>
 
@@ -154,8 +155,12 @@ static void drawPatternToCairoContext(cairo_t* cr, cairo_pattern_t* pattern, con
         cairo_fill(cr);
 }
 
-void PlatformContextCairo::drawSurfaceToContext(cairo_surface_t* surface, const FloatRect& destRect, const FloatRect& originalSrcRect, GraphicsContext* context)
+void PlatformContextCairo::drawSurfaceToContext(cairo_surface_t* surface, const FloatRect& destRect, const FloatRect& originalSrcRect, GraphicsContext& context)
 {
+    // Avoid invalid cairo matrix with small values.
+    if (std::fabs(destRect.width()) < 0.5f || std::fabs(destRect.height()) < 0.5f)
+        return;
+
     FloatRect srcRect = originalSrcRect;
 
     // We need to account for negative source dimensions by flipping the rectangle.
@@ -168,14 +173,23 @@ void PlatformContextCairo::drawSurfaceToContext(cairo_surface_t* surface, const 
         srcRect.setHeight(std::fabs(originalSrcRect.height()));
     }
 
-    // Cairo subsurfaces don't support floating point boundaries well, so we expand the rectangle.
-    IntRect expandedSrcRect(enclosingIntRect(srcRect));
+    RefPtr<cairo_surface_t> patternSurface = surface;
+    float leftPadding = 0;
+    float topPadding = 0;
+    if (srcRect.x() || srcRect.y() || srcRect.size() != cairoSurfaceSize(surface)) {
+        // Cairo subsurfaces don't support floating point boundaries well, so we expand the rectangle.
+        IntRect expandedSrcRect(enclosingIntRect(srcRect));
 
-    // We use a subsurface here so that we don't end up sampling outside the originalSrcRect rectangle.
-    // See https://bugs.webkit.org/show_bug.cgi?id=58309
-    RefPtr<cairo_surface_t> subsurface = adoptRef(cairo_surface_create_for_rectangle(
-        surface, expandedSrcRect.x(), expandedSrcRect.y(), expandedSrcRect.width(), expandedSrcRect.height()));
-    RefPtr<cairo_pattern_t> pattern = adoptRef(cairo_pattern_create_for_surface(subsurface.get()));
+        // We use a subsurface here so that we don't end up sampling outside the originalSrcRect rectangle.
+        // See https://bugs.webkit.org/show_bug.cgi?id=58309
+        patternSurface = adoptRef(cairo_surface_create_for_rectangle(surface, expandedSrcRect.x(),
+            expandedSrcRect.y(), expandedSrcRect.width(), expandedSrcRect.height()));
+
+        leftPadding = static_cast<float>(expandedSrcRect.x()) - floorf(srcRect.x());
+        topPadding = static_cast<float>(expandedSrcRect.y()) - floorf(srcRect.y());
+    }
+
+    RefPtr<cairo_pattern_t> pattern = adoptRef(cairo_pattern_create_for_surface(patternSurface.get()));
 
     ASSERT(m_state);
     switch (m_state->m_imageInterpolationQuality) {
@@ -184,11 +198,11 @@ void PlatformContextCairo::drawSurfaceToContext(cairo_surface_t* surface, const 
         cairo_pattern_set_filter(pattern.get(), CAIRO_FILTER_FAST);
         break;
     case InterpolationMedium:
-    case InterpolationHigh:
-        cairo_pattern_set_filter(pattern.get(), CAIRO_FILTER_BILINEAR);
-        break;
     case InterpolationDefault:
-        cairo_pattern_set_filter(pattern.get(), CAIRO_FILTER_BILINEAR);
+        cairo_pattern_set_filter(pattern.get(), CAIRO_FILTER_GOOD);
+        break;
+    case InterpolationHigh:
+        cairo_pattern_set_filter(pattern.get(), CAIRO_FILTER_BEST);
         break;
     }
     cairo_pattern_set_extend(pattern.get(), CAIRO_EXTEND_PAD);
@@ -199,12 +213,10 @@ void PlatformContextCairo::drawSurfaceToContext(cairo_surface_t* surface, const 
     // of the scale since the original width and height might be negative.
     float scaleX = std::fabs(srcRect.width() / destRect.width());
     float scaleY = std::fabs(srcRect.height() / destRect.height());
-    float leftPadding = static_cast<float>(expandedSrcRect.x()) - floorf(srcRect.x());
-    float topPadding = static_cast<float>(expandedSrcRect.y()) - floorf(srcRect.y());
     cairo_matrix_t matrix = { scaleX, 0, 0, scaleY, leftPadding, topPadding };
     cairo_pattern_set_matrix(pattern.get(), &matrix);
 
-    ShadowBlur& shadow = context->platformContext()->shadowBlur();
+    ShadowBlur& shadow = context.platformContext()->shadowBlur();
     if (shadow.type() != ShadowBlur::NoShadow) {
         if (GraphicsContext* shadowContext = shadow.beginShadowLayer(context, destRect)) {
             drawPatternToCairoContext(shadowContext->platformContext()->cr(), pattern.get(), destRect, 1);
@@ -293,7 +305,7 @@ void PlatformContextCairo::clipForPatternFilling(const GraphicsContextState& sta
     ASSERT(state.fillPattern);
 
     // Hold current cairo path in a variable for restoring it after configuring the pattern clip rectangle.
-    OwnPtr<cairo_path_t> currentPath = adoptPtr(cairo_copy_path(m_cr.get()));
+    auto currentPath = cairo_copy_path(m_cr.get());
     cairo_new_path(m_cr.get());
 
     // Initialize clipping extent from current cairo clip extents, then shrink if needed according to pattern.
@@ -324,7 +336,10 @@ void PlatformContextCairo::clipForPatternFilling(const GraphicsContextState& sta
     }
 
     // Restoring cairo path.
-    cairo_append_path(m_cr.get(), currentPath.get());
+    cairo_append_path(m_cr.get(), currentPath);
+    cairo_path_destroy(currentPath);
 }
 
 } // namespace WebCore
+
+#endif // USE(CAIRO)

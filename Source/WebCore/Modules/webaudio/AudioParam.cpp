@@ -139,8 +139,7 @@ void AudioParam::calculateFinalValues(float* values, unsigned numberOfValues, bo
     RefPtr<AudioBus> summingBus = AudioBus::create(1, numberOfValues, false);
     summingBus->setChannelMemory(0, values, numberOfValues);
 
-    for (unsigned i = 0; i < numberOfRenderingConnections(); ++i) {
-        AudioNodeOutput* output = renderingOutput(i);
+    for (auto& output : m_renderingOutputs) {
         ASSERT(output);
 
         // Render audio from this output.
@@ -172,11 +171,10 @@ void AudioParam::connect(AudioNodeOutput* output)
     if (!output)
         return;
 
-    if (m_outputs.contains(output))
+    if (!m_outputs.add(output).isNewEntry)
         return;
 
     output->addParam(this);
-    m_outputs.add(output);
     changedOutputs();
 }
 
@@ -188,8 +186,7 @@ void AudioParam::disconnect(AudioNodeOutput* output)
     if (!output)
         return;
 
-    if (m_outputs.contains(output)) {
-        m_outputs.remove(output);
+    if (m_outputs.remove(output)) {
         changedOutputs();
         output->removeParam(this);
     }

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -33,8 +33,62 @@ typedef struct CGColorSpace *CGColorSpaceRef;
 namespace WebCore {
 
 CGColorSpaceRef deviceRGBColorSpaceRef();
-CGColorSpaceRef sRGBColorSpaceRef();
+WEBCORE_EXPORT CGColorSpaceRef sRGBColorSpaceRef();
 CGColorSpaceRef linearRGBColorSpaceRef();
+
+inline CGAffineTransform getUserToBaseCTM(CGContextRef context)
+{
+    return CGAffineTransformConcat(CGContextGetCTM(context), CGAffineTransformInvert(CGContextGetBaseCTM(context)));
+}
+
+static inline CGColorSpaceRef cachedCGColorSpace(ColorSpace colorSpace)
+{
+    switch (colorSpace) {
+    case ColorSpaceDeviceRGB:
+        return deviceRGBColorSpaceRef();
+    case ColorSpaceSRGB:
+        return sRGBColorSpaceRef();
+    case ColorSpaceLinearRGB:
+        return linearRGBColorSpaceRef();
+    }
+    ASSERT_NOT_REACHED();
+    return deviceRGBColorSpaceRef();
+}
+
+class CGContextStateSaver {
+public:
+    CGContextStateSaver(CGContextRef context, bool saveAndRestore = true)
+        : m_context(context)
+        , m_saveAndRestore(saveAndRestore)
+    {
+        if (m_saveAndRestore)
+            CGContextSaveGState(m_context);
+    }
+    
+    ~CGContextStateSaver()
+    {
+        if (m_saveAndRestore)
+            CGContextRestoreGState(m_context);
+    }
+    
+    void save()
+    {
+        ASSERT(!m_saveAndRestore);
+        CGContextSaveGState(m_context);
+        m_saveAndRestore = true;
+    }
+
+    void restore()
+    {
+        ASSERT(m_saveAndRestore);
+        CGContextRestoreGState(m_context);
+        m_saveAndRestore = false;
+    }
+    
+private:
+    CGContextRef m_context;
+    bool m_saveAndRestore;
+};
 
 }
 
